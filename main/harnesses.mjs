@@ -1,5 +1,6 @@
 // One registry, no user-installed plugin execution or automatic enrollment.
 // Optional reads report absence; unsupported actions fail before side effects.
+import { ompkHarness } from './harnesses/ompk.mjs';
 import { claudeHarness } from './harnesses/claude.mjs';
 import { codexHarness } from './harnesses/codex.mjs';
 import { openCodeHarness } from './harnesses/opencode.mjs';
@@ -60,6 +61,7 @@ export function createHarnessRegistry(adapters) {
 // name gets the real adapter, and it is deliberately absent from `ENGINES`
 // (shared/engines.mjs) so no row can choose it and no picker draws it until
 // that is turned on deliberately. The two decisions are separate on purpose.
-const registry = createHarnessRegistry([claudeHarness, codexHarness, openCodeHarness]);
+// ompk is both, and leads the list as it leads the picker.
+const registry = createHarnessRegistry([ompkHarness, claudeHarness, codexHarness, openCodeHarness]);
 export const harnessFor = id => registry.get(id);
 export const supportsHarnessOperation = (id, name) => registry.supports(id, name);

@@ -165,10 +165,11 @@ describe('which engine a task runs on once the gate is open', () => {
 });
 
 describe('the names the engine rule holds', () => {
-  it('lists Claude Code first and Codex second', () => {
-    expect(ENGINES.map((e) => e.id)).toEqual(['claude', 'codex']);
-    expect(ENGINE_IDS).toEqual(['claude', 'codex']);
+  it('lists ompk first — it leads the picker in this fork — then Claude Code and Codex', () => {
+    expect(ENGINES.map((e) => e.id)).toEqual(['ompk', 'claude', 'codex']);
+    expect(ENGINE_IDS).toEqual(['ompk', 'claude', 'codex']);
     expect(engineLabel('codex')).toBe('Codex');
+    expect(engineLabel('ompk')).toBe('ompk');
     expect(engineLabel('cursor')).toBe('Claude Code');
     expect(engineLabel(null)).toBe('Claude Code');
   });
@@ -176,6 +177,7 @@ describe('the names the engine rule holds', () => {
   it('knows an engine id from anything else', () => {
     expect(isEngine('claude')).toBe(true);
     expect(isEngine('codex')).toBe(true);
+    expect(isEngine('ompk')).toBe(true);
     expect(isEngine('cursor')).toBe(false);
     expect(isEngine(null)).toBe(false);
     expect(isEngine(undefined)).toBe(false);

@@ -424,9 +424,10 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
         landOn={item.id}
         onWhole={() => setWhole(true)}
         onOpenOrigin={onOpenOrigin}
-        // Only a running Claude Code step can be cut; Codex takes her message
-        // at its next step whatever is pressed.
-        onSendNow={session && (session.engine ?? engine) !== 'codex'
+        // Codex takes her message at its next step whatever is pressed.
+        // ompk's next prompt cancels the turn still streaming, so Send now
+        // is that prompt rather than a second cancel.
+        onSendNow={session && (session.engine ?? engine ?? '') !== 'codex'
           ? onSendNow
           : undefined}
         md={md}

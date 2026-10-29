@@ -12,6 +12,7 @@ import {
   worthLookingAgain,
   type AskRow, type BarWords, type Engine, type EngineSetupState, type Plan, type StepRow,
 } from '../plan-setup';
+import { useAgentUpdates } from './AgentUpdates';
 import { Cap } from './Onboarding';
 import { hoverLit } from '../onboarding';
 
@@ -215,7 +216,7 @@ export function PlanQuestion({ onPick, onReady, onSkip, look, found = null }: {
 
   const readings = useCallback(async (fresh: boolean) => {
     if (look) return look(fresh);
-    const found = await Promise.all((['claude', 'codex'] as Engine[]).map((e) => api.engineSetup('ready', e)));
+    const found = await Promise.all((['ompk', 'claude', 'codex'] as Engine[]).map((e) => api.engineSetup('ready', e)));
     return found.map((f) => ({ engine: f.engine, found: !!f.found, signedIn: !!f.signedIn }));
   }, [look]);
 
@@ -404,6 +405,14 @@ export function PlanSetupCard({ plan, onDone, onSkip, state: given }: {
   // Bumped by Try again, which starts the same loop over on the same tool.
   const [round, setRound] = useState(0);
   const finished = useRef(false);
+  // ompk's sign-in is its own terminal wizard, not a browser page, so the
+  // moment the job reaches signing-in the app's update terminal is opened
+  // over it. Idempotent: main already opened the same session, this only
+  // brings it on screen.
+  const { setup: openOmpkSetup } = useAgentUpdates();
+  useEffect(() => {
+    if (engine === 'ompk' && state.phase === 'signing-in') openOmpkSetup('ompk');
+  }, [engine, state.phase]);
 
   useEffect(() => {
     if (given) return;

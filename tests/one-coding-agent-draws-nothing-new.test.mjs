@@ -73,7 +73,9 @@ describe('the two clauses that could have appeared anyway', () => {
   // the count is the list main handed over rather than anything worked out here.
   it('keeps the composer\'s engine clause behind more than one engine', () => {
     expect(compose).toMatch(/engineRows\.length > 1/);
-    expect(compose).toMatch(/engineChoices\s*\?\?\s*\[ENGINES\[0\]\]/);
+    // The fallback is the engine that runs by default, not the picker's first
+    // entry — ompk leads the list in this fork and is not the default.
+    expect(compose).toMatch(/engineChoices\s*\?\?\s*\[ENGINES\.find\(\(e\)\s*=>\s*e\.id === DEFAULT_ENGINE\)/);
   });
 
   // THE SETTINGS ROW IS GONE ENTIRELY SINCE 2026-09-23 (w-12081d32cc). It was a

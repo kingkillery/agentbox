@@ -19,7 +19,7 @@ import { isTroubleRow } from './trouble-row';
 import type { WorkItem } from './types';
 import { isUpdateRow } from './update-row';
 
-export type Harness = 'claude' | 'codex';
+export type Harness = 'ompk' | 'claude' | 'codex';
 
 export interface BoxFilter {
   project: string | null;
@@ -31,7 +31,7 @@ export type FilterPart = keyof BoxFilter;
 
 export const NO_FILTER: BoxFilter = { project: null, priority: null, harness: null };
 
-const HARNESSES: Harness[] = ['claude', 'codex'];
+const HARNESSES: Harness[] = ['ompk', 'claude', 'codex'];
 
 // The labels that mark a conversation as Codex's, the same set the byline reads
 // (`bylineFacts`). Exact words, so a label that merely contains "codex" is not one.
@@ -44,6 +44,7 @@ const CODEX_LABELS = new Set(['codex', 'codex-import', 'not-imported']);
  * Code, which is the reading `engineOf` makes in main/supervisor.mjs too.
  */
 export function harnessOf(item: Pick<WorkItem, 'labels'> & { engine?: string | null }): Harness {
+  if (item.engine === 'ompk') return 'ompk';
   if (item.engine === 'codex') return 'codex';
   if ((item.labels ?? []).some((l) => CODEX_LABELS.has(l) || l.startsWith('codex:'))) return 'codex';
   return 'claude';
@@ -151,9 +152,13 @@ export function filterMenu(rows: Row[], f: BoxFilter, products: Product[], direc
   const priorities = PRIORITIES.map((p) => ({ value: p.id, label: p.label, count: byLevel.get(p.id) ?? 0, on: f.priority === p.id }));
 
   const byHarness = count('harness', harnessOf);
-  const both = HARNESSES.every((h) => (byHarness.get(h) ?? 0) > 0);
-  const harnesses = both || f.harness
-    ? HARNESSES.map((h) => ({ value: h, label: engineLabel(h), count: byHarness.get(h) ?? 0, on: f.harness === h }))
+  // THE FILTER IS OFFERED WHEN PICKING WOULD MEAN SOMETHING — the box holds
+  // rows from at least two agents — or while a harness pick is already on and
+  // needs a way off. A box that is all one agent does not offer to hide it.
+  const several = HARNESSES.filter((h) => (byHarness.get(h) ?? 0) > 0).length > 1;
+  const harnesses = several || f.harness
+    ? HARNESSES.filter((h) => (byHarness.get(h) ?? 0) > 0 || h === f.harness)
+        .map((h) => ({ value: h, label: engineLabel(h), count: byHarness.get(h) ?? 0, on: f.harness === h }))
     : [];
 
   return { projects, moreProjects, priorities, harnesses };

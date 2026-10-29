@@ -13,6 +13,7 @@ import { gitJob } from './git-change-offthread.mjs';
 import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mjs';
 import { taskCommand } from './task-commands.mjs';
 import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mjs';
+import { ompkCommandNames } from './ompk.mjs';
 import {agentInstructionsUnified, readSystemTemplate, writeInstruction} from './instruction-settings.mjs';
 import {fillName} from '../shared/product-name.mjs';
 // The supervisor: deterministic, boring, and the only part of the app that talks
@@ -144,6 +145,7 @@ import { createCodexWorker, mcpServerNames, resumeThreadParams, workerThreadPara
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
 import { cloudCodexMode } from './cloud-permission.mjs';
 import { createCodexApprovals } from './codex-approvals.mjs';
+import { createAcpApprovals } from './acp-approvals.mjs';
 import { approvalPublicKey, listPending } from './approvals.mjs';
 import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexModels } from './codex-models.mjs';
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mjs';
@@ -962,6 +964,7 @@ export class Supervisor {
     // engine's words: workers still running under permission rules no new spawn
     // would produce.
     this._closeCodex();
+    this._closeAcpCards();
     // A wake scheduled a moment before the app quits would otherwise fire into
     // a stopped fleet and spawn one more worker on the way out.
     clearTimeout(this._wakeTimer);
@@ -1032,6 +1035,7 @@ export class Supervisor {
     // brought home when the app opens again.
     for (const session of this.sessions.values()) this._kill(session, session.cloud && session.engine !== 'codex' ? 'SIGHUP' : undefined);
     this._closeCodex(`${Name} is quitting`);
+    this._closeAcpCards(`${Name} is quitting`);
     this.stopMemoryGate();
     clearInterval(this._leftoverTimer);
     clearInterval(this._memoryLogTimer);
@@ -8544,10 +8548,10 @@ export class Supervisor {
     // come from the sign-in check (main/engine-setup.mjs); until it has
     // answered, nothing moves.
     const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true;
-    return { claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
+    return { ompk: !!this.config.ompkBin, claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
   }
 
-  /** What runs when nobody chose: Claude Code, or Codex on a Mac without it. */
+  /** What runs when nobody chose: ompk where it is installed, else Claude Code, or Codex on a Mac without it. */
   _homeEngine() {
     return homeEngine(this._enginesFound());
   }
@@ -9532,6 +9536,43 @@ export class Supervisor {
     return this._codexCards?.changed(id, shown) ?? false;
   }
 
+  /**
+   * THE CARDS AN ACP WORKER RAISES, one spool-side for the whole fleet as
+   * Codex's is. What comes back is one worker's scope of it: `ask` is what
+   * the ompk harness holds a permission request on, and the worker's exit
+   * closes its scope, which denies whatever it still has open. Answered
+   * through the same door as every other engine's cards (main/ipc.mjs).
+   */
+  _acpApprovals(item = null) {
+    if (!this._acpCards) {
+      this._acpCards = createAcpApprovals({
+        storeRoot: this.config.storeRoot,
+        onChange: () => this.onChange?.(),
+      });
+    }
+    return this._acpCards.scope({ product: item?.product ?? null, item: item?.id ?? null });
+  }
+
+  /** The founder answered an ACP card. The ACP twin of `settleCodexApproval`. */
+  settleAcpApproval(id, allow, note) {
+    return this._acpCards?.settle(id, allow, note) ?? false;
+  }
+
+  /** The ACP twin of `codexCardChanged`, and false for any other engine's card. */
+  acpCardChanged(id, shown) {
+    return this._acpCards?.changed(id, shown) ?? false;
+  }
+
+  /**
+   * Deny every ACP card still open when the supervisor goes, for the reason
+   * `_closeCodex` does Codex's: a question whose answerer has quit is a
+   * worker parked forever. The workers themselves are children like
+   * Claude's and go with their sessions; this is only their questions.
+   */
+  _closeAcpCards(why = `${Name} is shutting down`) {
+    try { this._acpCards?.close(why); } catch { /* already gone */ }
+  }
+
   // A loaded app-server thread holds Codex's writer lock even after its turn
   // finishes. Closing an idle account returns its sessions to the native CLI.
   _releaseIdleCodex(profile = 'default') {
@@ -10071,7 +10112,7 @@ export class Supervisor {
       }
       if (harness.capabilities.nativeCommands) {
         try {
-          const names = nativeCommandNames(JSON.parse(frame[0]));
+          const names = engine === 'ompk' ? ompkCommandNames(frame[0], frame[1]) : nativeCommandNames(JSON.parse(frame[0]));
           if (names) { this._nativeCommands ??= {}; this._nativeCommands[item.id] = names; this._saveState(); }
         } catch { /* Non-JSON output is handled by the existing readers. */ }
       }

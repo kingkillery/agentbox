@@ -13,6 +13,7 @@
 //
 // Two forks, like the ship, because a dozen agents share this Mac.
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { testsThatRead } from './lib/tests-that-read.mjs';
@@ -42,9 +43,31 @@ if (!files.length) {
 
 const readers = testsThatRead(files, root).filter((f) => !files.includes(f));
 console.log(`test:changed: ${files.length} changed file(s)${readers.length ? ` and ${readers.length} test(s) that read one as text` : ''}.`);
-const run = spawnSync('npx', ['vitest', 'related', '--run', '--passWithNoTests', ...files, ...readers], {
-  cwd: root,
-  stdio: 'inherit',
-  env: { ...process.env, VITEST_MAX_FORKS: process.env.VITEST_MAX_FORKS ?? '2', VITEST_MIN_FORKS: process.env.VITEST_MIN_FORKS ?? '1' },
-});
-process.exit(run.status ?? 1);
+// Node's own binary, not `npx`: on Windows `npx` is a .cmd that spawnSync
+// cannot resolve without a shell, which used to end this script with exit 1
+// and not one test run.
+const vitest = createRequire(path.join(root, 'package.json')).resolve('vitest/vitest.mjs');
+// AND NOT ONE COMMAND LINE OF A THOUSAND PATHS: Windows caps a process's
+// command line at about 32K characters, which a big change here is well past,
+// so the run goes out in chunks small enough to carry. related() is per
+// chunk, which is the same set of tests over both — a test that reads two
+// changed files just runs twice.
+const ARG_MAX = 28_000;
+const wanted = [...files, ...readers];
+const chunks = [];
+for (const file of wanted) {
+  let chunk = chunks[chunks.length - 1];
+  if (!chunk || chunk.size + file.length + 1 > ARG_MAX) { chunk = { files: [], size: 0 }; chunks.push(chunk); }
+  chunk.files.push(file); chunk.size += file.length + 1;
+}
+if (chunks.length > 1) console.log(`test:changed: ${wanted.length} paths go in ${chunks.length} runs, under the command-line limit.`);
+for (const chunk of chunks) {
+  const run = spawnSync(process.execPath, [vitest, 'related', '--run', '--passWithNoTests', ...chunk.files], {
+    cwd: root,
+    stdio: 'inherit',
+    env: { ...process.env, VITEST_MAX_FORKS: process.env.VITEST_MAX_FORKS ?? '2', VITEST_MIN_FORKS: process.env.VITEST_MIN_FORKS ?? '1' },
+  });
+  if (run.error) { console.error(`test:changed: vitest did not start: ${run.error.message}`); process.exit(1); }
+  if (run.status !== 0) process.exit(run.status ?? 1);
+}
+process.exit(0);

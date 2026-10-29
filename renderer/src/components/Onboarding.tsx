@@ -1248,7 +1248,7 @@ export function Onboarding({
   const askMac = (fresh = false) => {
     if (fresh || !asked.current) {
       asked.current = import('../api').then(({ api }) => Promise.all([
-        api.engineSetup('ready', 'claude'), api.engineSetup('ready', 'codex'),
+        api.engineSetup('ready', 'ompk'), api.engineSetup('ready', 'claude'), api.engineSetup('ready', 'codex'),
       ])).then((r) => r.map((x) => ({ engine: x.engine, found: !!x.found, signedIn: !!x.signedIn })))
         // A failed probe reads as empty, which sends them to the plan question
         // rather than stopping the walk.

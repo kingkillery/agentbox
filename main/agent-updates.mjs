@@ -42,7 +42,7 @@ export class AgentUpdates{
  constructor({installation,latest=latestRelease,refresh=async()=>{},terminals,now=()=>Date.now()}={}){
   this.installation=installation;this.latest=latest;this.refresh=refresh;this.now=now;this.entries=new Map();this.checks=new Map();this.starts=new Map();this.finishes=new Map();this.plans=new Map();
   this.terminals=terminals||new TaskTerminals({sweepMs:0});
-  this.terminals.resolve=engine=>{const p=this.plans.get(engine);if(!p)throw Error('Click Update now first.');return {cwd:p.home,command:{file:p.file,args:p.args,env:p.env},notice:`Updating ${p.name}.`}};
+  this.terminals.resolve=engine=>{const p=this.plans.get(engine);if(!p)throw Error('Click Update now first.');return {cwd:p.home,command:{file:p.file,args:p.args,env:p.env},notice:p.notice??`Updating ${p.name}.`}};
  }
  status(engine){return this.entries.get(engine)||{engine,state:'unknown'};}
  check(engine,force=false){
@@ -87,6 +87,28 @@ export class AgentUpdates{
   this.starts.set(engine,work);return work;
  }
  settled(engine){return this.finishes.get(engine)||Promise.resolve();}
+ /**
+  * THE AGENT'S OWN SETUP IN THE APP'S TERMINAL, for the tool whose sign-in is
+  * an interactive wizard: `ompk setup` exits "requires an interactive TTY" on a
+  * pipe (measured on Windows 2026-10-29), so it rides this PTY exactly the way
+  * an update does, and the settings row presses this instead of a headless
+  * spawn nobody could answer.
+  */
+ async setup(engine){
+  if(!harnessDefinition(engine))throw Error('Unknown agent.');
+  if(this.terminals.sessions.has(engine))return{engine,state:'running'};
+  const install=await this.installation(engine);
+  const signIn=harnessFor(engine).signIn(install.bin);
+  this.plans.set(engine,{file:signIn.file,args:signIn.args,home:install.home,name:harnessFor(engine).label,notice:`Setting up ${harnessFor(engine).label}.`});
+  this.terminals.close(engine);
+  this.terminals.open(engine);
+  // When the wizard exits, settle back to a checked answer so the row reads
+  // the truth again rather than "running" for ever.
+  this.terminals.get(engine).exitPromise.then(async()=>{
+   try{this.entries.set(engine,await this.check(engine,true));}catch{this.entries.set(engine,{engine,state:'unknown'});}
+  });
+  return entry;
+ }
  terminal(engine,p){
   // Opening the viewer is never an install action, including after it ended.
   if(!this.plans.has(engine))throw Error('Click Update now first.');

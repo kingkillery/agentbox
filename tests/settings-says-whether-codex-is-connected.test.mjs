@@ -69,7 +69,9 @@ import { Supervisor } from '../main/supervisor.mjs';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+// LF WHAT GIT CHECKS OUT: a Windows working tree is CRLF, and a pin that
+// contains a newline must not depend on the checkout's line endings.
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replaceAll('\r\n', '\n');
 
 const settings = read('renderer/src/components/Settings.tsx');
 const api = read('renderer/src/api.ts');

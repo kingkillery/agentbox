@@ -52,7 +52,8 @@ export function webSettingsPages(computer: SettingsRow | null): Set<string> {
   const w = computer?.settings?.workspace;
   if (!w) return new Set(['appearance', 'phone']);
   const codex = (w.engines ?? []).includes('codex') || !!w.codex?.found;
-  return new Set(['general', 'appearance', 'phone', 'alpha', 'claude', ...(codex ? ['codex'] : []), 'running', 'projects']);
+  const ompk = (w.engines ?? []).includes('ompk') || !!w.ompk?.found;
+  return new Set(['general', 'appearance', 'phone', 'alpha', ...(ompk ? ['ompk'] : []), 'claude', ...(codex ? ['codex'] : []), 'running', 'projects']);
 }
 
 /**
@@ -60,8 +61,11 @@ export function webSettingsPages(computer: SettingsRow | null): Set<string> {
  * not on this computer" and then offer its accounts and its permission mode
  * underneath: three answers where there is one, and nothing to sign in to.
  */
-export function webSettingsGroups(workspace: any, engine: 'claude' | 'codex'): string[] {
-  return workspace?.[engine]?.found ? ['accounts', 'permissions'] : ['status'];
+export function webSettingsGroups(workspace: any, engine: 'ompk' | 'claude' | 'codex'): string[] {
+  if (!workspace?.[engine]?.found) return ['status'];
+  // ompk's page has a sign-in row where the others have accounts; it draws no
+  // permissions group because a run's permissions are the cards it raises.
+  return engine === 'ompk' ? ['signed-in'] : ['accounts', 'permissions'];
 }
 
 /**

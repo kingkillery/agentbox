@@ -57,6 +57,7 @@ import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
 import { TaskTerminal } from './TaskTerminal';
+import { useAgentUpdates } from './AgentUpdates';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
 import type { Product } from '../types';
@@ -1141,7 +1142,41 @@ const CODEX = {
   searchAgain: 'Look for it instead',
 } as const;
 
-type ConnectionCopy = typeof CLAUDE | typeof CODEX;
+/* ---------------------- AND THE PREMIER ONE, IN THIS FORK ---------------------- */
+// ompk (oh-my-pk) leads the picker and is what a machine that has it runs when
+// nobody chose, so its words are the first engine's, not the second's: being
+// connected means the agents have something to run on. Sign-in and models are
+// ompk's own (its `ompk setup` and `/login`, its own config), so the page
+// carries the connection and the sign-in state and nothing it would have to
+// invent -- no usage and no model list, which main declares missing rather
+// than faking (main/harnesses/ompk.mjs).
+const OMPK = {
+  name: 'ompk',
+  connected: 'ompk is connected',
+  connectedSay: `${Name} can see it on this computer, so your agents can run. In this fork it is the first choice: a task nobody picked an engine for goes to ompk.`,
+  trouble: 'ompk is here but not working',
+  missing: 'ompk is not on this computer',
+  missingSay: `${Name} could not find ompk on this computer. Install it, then check again. Until then every task runs on Claude Code or Codex.`,
+  missingLink: 'Get ompk',
+  unsure: `${Name} could not check`,
+  unsureSay: `${Name} has not been able to look for ompk on this computer. That is not the same as it being missing, only that the answer never came back. Try again in a moment.`,
+  check: 'Check again',
+  checking: 'Looking',
+  getSay: 'It takes a few minutes. Come back here and press Check again, and your agents can run on ompk.',
+  still: 'Still nothing here. A fresh install can take a moment to appear.',
+  stillUnsure: `${Name} still could not get an answer. Nothing is necessarily wrong; try once more in a minute.`,
+  where: (bin: string) => `${Name} runs it from ${bin}.`,
+  point: 'Choose the file',
+  pointLabel: 'Keep it somewhere else?',
+  pointSay: `If ${Name} is looking in the wrong place, show it where ompk is.`,
+  picking: 'Choosing',
+  chosenLabel: 'You chose this one',
+  chosenSay: `You showed ${Name} where it is, so it stopped looking. Let it look again if that was wrong.`,
+  chosenGoneSay: `The file you chose is not there any more. Choose another, or let ${Name} look.`,
+  searchAgain: 'Look for it instead',
+} as const;
+
+type ConnectionCopy = typeof CLAUDE | typeof CODEX | typeof OMPK;
 
 type EngineAccount = { email: string | null; name: string | null; plan: string | null; planNamed?: boolean; mode: string | null; accountId: string | null };
 
@@ -1201,7 +1236,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
    *  when somebody points at the file themselves. The path comes back from the
    *  panel main opened; it never goes the other way (main/ipc.mjs,
    *  `zero:engine-bin`). */
-  engine: 'claude' | 'codex';
+  engine: 'ompk' | 'claude' | 'codex';
   /**
    * The search this card's button runs. It is the engine's own, because
    *  looking for Claude Code tells you nothing about Codex. */
@@ -1360,6 +1395,10 @@ const ClaudeCode = (props: EngineConnectionProps) => (
 
 const CodexCli = (props: EngineConnectionProps) => (
   <Connection copy={CODEX} check={api.recheckCodex} engine="codex" {...props} />
+);
+
+const OmpkCli = (props: EngineConnectionProps) => (
+  <Connection copy={OMPK} check={api.recheckOmpk} engine="ompk" {...props} />
 );
 
 /* THE UPDATES GROUP CAME BACK, AS ONE ROW WITH ONE BUTTON (w-39d6c237f7,
@@ -1545,6 +1584,7 @@ function NavIcon({ id }: { id: SettingsPageId }) {
     appearance: <><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none" /></>,
     shortcuts: <><rect x="3.5" y="6.5" width="17" height="11" rx="2" /><path d="M7.5 10.5h.01M11 10.5h.01M14.5 10.5h.01M8.5 14h7" /></>,
     phone: <><rect x="7" y="3" width="10" height="18" rx="2.2" /><path d="M11 17.5h2" /></>,
+    ompk: <><circle cx="12" cy="12" r="3.2" /><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6 6l2.1 2.1M18 6l-2.1 2.1M6 18l2.1-2.1M18 18l-2.1-2.1" /></>,
     claude: <><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="m7.5 10 2.5 2-2.5 2M12.5 14.5h4" /></>,
     codex: <><path d="m9 8-4 4 4 4M15 8l4 4-4 4" /></>,
     running: <><circle cx="12" cy="12" r="8" /><path d="M10.5 9.2v5.6l4.5-2.8z" /></>,
@@ -1666,6 +1706,10 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   }, [pane]);
 
   const [error, setError] = useState<string | null>(null);
+  // ompk's sign-in runs in the app's terminal (its setup is interactive and
+  // needs a real TTY), so the press on its page opens the same panel the
+  // update buttons use rather than a spawn nobody could answer.
+  const { setup: ompkSetup } = useAgentUpdates();
 
   const load = useCallback(async () => {
     const s = await api.settings();
@@ -1843,6 +1887,38 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   };
 
   const isOn = (id: SettingsPageId) => pane === id || (id === 'projects' && typeof pane === 'object');
+
+  // ompk's own page is its connection and its sign-in, and no more: there are
+  // no accounts to tile (one sign-in, in ompk's own home), no usage to read
+  // (main declares it missing rather than zero), and no modes to pick (a
+  // run's permissions are the cards it raises, answered on the row). What is
+  // not here is ompk's own to set up, in `ompk setup`.
+  const ompkPage = () => {
+    if (!w?.ompk) return null;
+    const o = w.ompk;
+    const status = { found: o.found, certain: o.certain, bin: o.bin, chosen: !!o.chosen, url: o.url, trouble: o.trouble, onChecked: load };
+    return (
+      <Page title="ompk">
+        <OmpkCli {...status} />
+        {o.found && (
+          <Group id="signed-in" label="Signed in">
+            <Row
+              label={o.signedIn ? 'Signed in' : 'Not signed in'}
+              desc={o.signedIn
+                ? 'ompk keeps its sign-in in its own home (~/.ompk/agent), and your agents run on it. Agentbox never sees the key.'
+                : 'ompk has no sign-in in its home yet. Open its own setup -- it runs in the app terminal because it is interactive -- and this page will say so.'}
+            >
+              {!o.signedIn && (
+                <button type="button" className="set-btn" onClick={() => { ompkSetup('ompk'); load(); }}>
+                  Set up ompk
+                </button>
+              )}
+            </Row>
+          </Group>
+        )}
+      </Page>
+    );
+  };
 
   /** One coding agent's page: what is wrong with it if anything, how much is
    *  left, which account, and what it may do. */
@@ -2222,6 +2298,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
           </Page>
         )}
 
+        {model && w && pane === 'ompk' && ompkPage()}
         {model && w && pane === 'claude' && enginePage('claude')}
         {model && w && pane === 'codex' && w.codex && enginePage('codex')}
 

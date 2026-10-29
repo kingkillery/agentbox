@@ -28,11 +28,20 @@ describe('the engine a new thread card opens on', () => {
   it('is Claude Code on a Mac with both and nothing picked', () => {
     expect(startingEngine(null, [CLAUDE, CODEX])).toBe('claude');
   });
+  it('is ompk on a Mac that has it, with nothing picked', () => {
+    const OMPK = { id: 'ompk', label: 'ompk', word: 'ompk' };
+    expect(startingEngine(null, [OMPK])).toBe('ompk');
+    expect(startingEngine(null, [OMPK, CLAUDE, CODEX])).toBe('ompk');
+    expect(startingEngine(null, [OMPK, CODEX])).toBe('ompk');
+    // A remembered pick still wins on that Mac.
+    expect(startingEngine('codex', [OMPK, CLAUDE, CODEX])).toBe('codex');
+  });
   it('keeps a Codex pick on a Mac with both', () => {
     expect(startingEngine('codex', [CLAUDE, CODEX])).toBe('codex');
   });
   it('is Claude Code on a Mac that offers only Claude Code, whatever was picked', () => {
     expect(startingEngine('codex', [CLAUDE])).toBe('claude');
+    expect(startingEngine('ompk', [CLAUDE])).toBe('claude');
   });
   it('is Claude Code when the list is not known yet', () => {
     expect(startingEngine(null, undefined)).toBe('claude');
@@ -40,8 +49,8 @@ describe('the engine a new thread card opens on', () => {
   });
   it('is what the card uses, and it lists no Claude model where Claude Code is not offered', () => {
     const card = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
-    expect(card).toMatch(/recentModels\(items, \{ codexModels, codexDefault, codexOffered, claudeOffered \}\)/);
-    expect(card).toMatch(/allModels\(\{ codexModels, codexOffered, claudeOffered \}\)/);
+    expect(card).toMatch(/recentModels\(items, \{ codexModels, codexDefault, codexOffered, claudeOffered, ompkOffered \}\)/);
+    expect(card).toMatch(/allModels\(\{ codexModels, codexOffered, claudeOffered, ompkOffered \}\)/);
     // Seen in the real app: All models drew an empty CLAUDE CODE heading
     // beside the Codex list. A column is drawn only when it has rows. The
     // drawing moved into ./ModelMenu.tsx on w-e1a42f6b21, where the reply box

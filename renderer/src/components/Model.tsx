@@ -60,7 +60,7 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
 }) {
   const [open, setOpen] = useState(openAtStart);
   const {updates,start}=useAgentUpdates();
-  const updateEngine=engine==='codex'?'codex':'claude';
+  const updateEngine = engine === 'codex' ? 'codex' : engine === 'ompk' ? 'ompk' : 'claude';
   const update=updates[updateEngine];
   const showUpdate=['available','running','failed'].includes(update?.state);
   const [cursor, setCursor] = useState(0);
@@ -113,7 +113,7 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
     >
       {open && (
         <span className="prio-menu model-menu" role="listbox" aria-label="Model">
-          {showUpdate&&<span className="model-update-row"><span>{updateEngine==='codex'?'Codex':'Claude Code'}</span><button type="button" title={`Update ${updateEngine==='codex'?'Codex':'Claude Code'} in the app terminal`} onClick={()=>{setOpen(false);start(updateEngine);}}>{update.state==='running'?'Updating…':'Update now'}</button></span>}
+          {showUpdate&&<span className="model-update-row"><span>{updateEngine==='codex'?'Codex':updateEngine==='ompk'?'ompk':'Claude Code'}</span><button type="button" title={`Update ${updateEngine==='codex'?'Codex':updateEngine==='ompk'?'ompk':'Claude Code'} in the app terminal`} onClick={()=>{setOpen(false);start(updateEngine);}}>{update.state==='running'?'Updating…':'Update now'}</button></span>}
           {rows.map((m, i) => (
             <button
               key={m.id}

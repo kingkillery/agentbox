@@ -12,6 +12,7 @@ import crypto from 'node:crypto';
 import { resolveClaudeBin, candidatePaths } from './claude-bin.mjs';
 import { warmShellAnswers } from './engine-bin.mjs';
 import { resolveCodexBin } from './codex-bin.mjs';
+import { resolveOmpkBin } from './ompk-bin.mjs';
 import { defaultStoreRoot } from './store/home.mjs';
 import { readPlans, slotsForPlans } from './claude-plan.mjs';
 import { machineSlots } from './machine.mjs';
@@ -261,6 +262,19 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
   config.codexFound = codex.found;
   config.codexCertain = codex.certain !== false;
   config.codexFrom = codex.from;
+  // AND WHERE ompk IS, THROUGH THE SAME DOOR. ompk is this fork's premier
+  // engine, so finding it here is what makes it the home engine
+  // (shared/engines.mjs) from the first read of the app, and a miss is null
+  // exactly as Codex's is: no invented path, and nothing anywhere draws an
+  // engine that is not installed.
+  config.ompkBinConfigured = typeof overrides.ompkBin === 'string' && overrides.ompkBin
+    ? overrides.ompkBin
+    : null;
+  const ompk = resolveOmpkBin(config.ompkBinConfigured);
+  config.ompkBin = ompk.found ? ompk.path : null;
+  config.ompkFound = ompk.found;
+  config.ompkCertain = ompk.certain !== false;
+  config.ompkFrom = ompk.from;
   // AND AN OLDER INSTALL WITH CODEX ON IT OPENS THE CHOICE TOO (w-d5d632e503).
   // Only a Mac with no config file did, so a person who installed before
   // that, or who added Codex later, never saw Codex anywhere. Written at the

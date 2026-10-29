@@ -767,7 +767,7 @@ export const api = {
     return window.zero!.dashboard(slug);
   },
 
-  async agentUpdate(engine:string,action:'check'|'recheck'|'start'|'status'|'refresh'):Promise<any>{
+  async agentUpdate(engine:string,action:'check'|'recheck'|'start'|'setup'|'status'|'refresh'):Promise<any>{
     if(useFixtures)return params.has('modelUpdates')?modelUpdateFixture.action(engine,action):{engine,state:'current'};
     if(!window.zero?.agentUpdate)return {engine,state:'unknown'};
     return window.zero.agentUpdate({engine,action});
@@ -1238,6 +1238,22 @@ export const api = {
     }
   },
 
+  async recheckOmpk(): Promise<{ found: boolean; certain: boolean }> {
+    if (useFixtures) {
+      const ompk = fixtureSettingsState.workspace.ompk;
+      return { found: !!ompk?.found, certain: !!ompk?.certain };
+    }
+    const zero = window.zero as any;
+    if (!zero?.ompkRecheck) return { found: false, certain: false };
+    try {
+      const r = await zero.ompkRecheck();
+      if (!r?.ok) return { found: false, certain: false };
+      return { found: !!r.workspace?.found, certain: r.workspace?.certain === true };
+    } catch {
+      return { found: false, certain: false };
+    }
+  },
+
   /* * POINT AT THE CODING AGENT YOURSELF, when neither search can find it
      (w-ce8c1a9275). The picker opens in the main process and the choice is
      applied in the same call, so this call hands over WHICH agent and nothing
@@ -1250,7 +1266,7 @@ export const api = {
      be run, is an ordinary mistake at a file panel and the row prints what came
      back. Cancelling the panel is neither: `ok` with nothing changed.
   */
-  async engineBin(engine: 'claude' | 'codex', action?: 'search'): Promise<Settings & { canceled?: boolean; refused?: string }> {
+  async engineBin(engine: 'ompk' | 'claude' | 'codex', action?: 'search'): Promise<Settings & { canceled?: boolean; refused?: string }> {
     if (useFixtures) return { ...emptySettings, ok: true, canceled: true };
     const zero = window.zero as any;
     if (!zero?.engineBin) return { ...emptySettings, ok: false, error: RESTART_NOTE };
@@ -1265,7 +1281,7 @@ export const api = {
   // start its own sign-in. A page that cannot reach the main process answers
   // READY, because a walk that asks a question it can do nothing about is a
   // walk that traps somebody; the inbox's own checks still stand behind it.
-  async engineSetup(action: 'ready' | 'start' | 'status' | 'again' | 'cancel', engine: 'claude' | 'codex'): Promise<EngineSetupState> {
+  async engineSetup(action: 'ready' | 'start' | 'status' | 'again' | 'cancel', engine: 'ompk' | 'claude' | 'codex'): Promise<EngineSetupState> {
     const assumeReady: EngineSetupState = { engine, phase: 'ready', error: null, log: '', found: true, signedIn: true };
     /*
      * A FIXTURE WORLD THAT SAYS THE COMPUTER IS EMPTY IS ANSWERED THAT WAY

@@ -17,12 +17,13 @@ import { firstName } from '../team/company';
 import type { Person } from '../types';
 import { projectSeenBy } from '../../../shared/thread-cards.mjs';
 
-export type Harness = 'claude' | 'codex';
+export type Harness = 'ompk' | 'claude' | 'codex';
 
 /** One model as the card holds it: where it runs, and the word that runs it. */
 export interface ModelPick {
   engine: Harness;
-  /** A Claude Code alias (`opus`), or a Codex slug (`gpt-6-astra`). */
+  /** A Claude Code alias (`opus`), a Codex slug (`gpt-6-astra`), or a model
+   *  word ompk itself knows; '' on an ompk pick is its own configured model. */
   model: string;
 }
 
@@ -78,8 +79,8 @@ const WINDOW = 40;
  */
 export function recentModels(
   items: ReadonlyArray<{ createdAt?: number; model?: string; engine?: string }>,
-  { codexModels = [], codexDefault = null, codexOffered, claudeOffered = true, limit = 3 }:
-    { codexModels?: readonly CodexRow[]; codexDefault?: string | null; codexOffered: boolean; claudeOffered?: boolean; limit?: number },
+  { codexModels = [], codexDefault = null, codexOffered, claudeOffered = true, ompkOffered = false, limit = 3 }:
+    { codexModels?: readonly CodexRow[]; codexDefault?: string | null; codexOffered: boolean; claudeOffered?: boolean; ompkOffered?: boolean; limit?: number },
 ): ModelPick[] {
   const out: ModelPick[] = [];
   const seen = new Set<string>();
@@ -95,10 +96,10 @@ export function recentModels(
     .slice(0, WINDOW)
     .map((i) => {
       const model = i.model as string;
-      const engine: Harness = i.engine === 'codex' || i.engine === 'claude' ? i.engine : harnessOf(model, codexModels);
+      const engine: Harness = i.engine === 'codex' || i.engine === 'claude' || i.engine === 'ompk' ? i.engine : harnessOf(model, codexModels);
       return { pick: { engine, model: engine === 'claude' ? claudeAliasOf(model) : model }, at: i.createdAt ?? 0 };
     })
-    .filter(({ pick }) => (pick.engine === 'codex' ? codexOffered : claudeOffered));
+    .filter(({ pick }) => (pick.engine === 'codex' ? codexOffered : pick.engine === 'ompk' ? ompkOffered : claudeOffered));
   const tally = new Map<string, { pick: ModelPick; count: number; last: number }>();
   for (const { pick, at } of used) {
     const row = tally.get(keyOf(pick)) ?? { pick, count: 0, last: 0 };
@@ -109,10 +110,14 @@ export function recentModels(
   // A MAC WITHOUT CLAUDE CODE IS OFFERED NO CLAUDE MODEL (w-db6f5e331e): it
   // has nothing to run one in, and the menu is a list of what it can run.
   if (!claudeOffered) {
+    // ompk holds no model list of its own, so what it offers is its own
+    // configured model, drawn as its one row ('').
+    if (ompkOffered) add({ engine: 'ompk', model: '' });
     if (codexOffered) add({ engine: 'codex', model: codexDefault ?? codexModels[0]?.id ?? CODEX_OWN });
     for (const m of codexOffered ? codexModels : []) add({ engine: 'codex', model: m.id });
     return out;
   }
+  if (ompkOffered) add({ engine: 'ompk', model: '' });
   add({ engine: 'claude', model: DEFAULT_MODEL });
   add({ engine: 'claude', model: 'sonnet' });
   if (codexOffered) add({ engine: 'codex', model: codexDefault ?? codexModels[0]?.id ?? CODEX_OWN });
@@ -120,21 +125,24 @@ export function recentModels(
   return out;
 }
 
-/** Everything behind "All models": Claude Code's list and, when offered, Codex's. */
-export function allModels({ codexModels = [], codexOffered, claudeOffered = true }: { codexModels?: readonly CodexRow[]; codexOffered: boolean; claudeOffered?: boolean }): {
-  claude: ModelPick[]; codex: ModelPick[];
+/** Everything behind "All models": each offered engine's own list -- and ompk's
+ *  one row, which is its own model because it holds no list to offer. */
+export function allModels({ codexModels = [], codexOffered, claudeOffered = true, ompkOffered = false }: { codexModels?: readonly CodexRow[]; codexOffered: boolean; claudeOffered?: boolean; ompkOffered?: boolean }): {
+  ompk: ModelPick[]; claude: ModelPick[]; codex: ModelPick[];
 } {
   return {
+    ompk: ompkOffered ? [{ engine: 'ompk' as const, model: '' }] : [],
     claude: claudeOffered ? claudeModelRows().map((m) => ({ engine: 'claude' as const, model: m.id })) : [],
     codex: codexOffered ? codexModels.map((m) => ({ engine: 'codex' as const, model: m.id })) : [],
   };
 }
 
 /** The "N more" on the All models row: what is in the columns and not in Recent. */
-export function moreCount(recent: readonly ModelPick[], all: { claude: readonly ModelPick[]; codex: readonly ModelPick[] }): number {
-  const listed = new Set([...all.claude, ...all.codex].map(keyOf));
+export function moreCount(recent: readonly ModelPick[], all: { ompk?: readonly ModelPick[]; claude: readonly ModelPick[]; codex: readonly ModelPick[] }): number {
+  const listed = new Set([...(all.ompk ?? []), ...all.claude, ...all.codex].map(keyOf));
   return listed.size - recent.filter((r) => listed.has(keyOf(r))).length;
 }
+
 
 export const sameModel = (a: ModelPick | null | undefined, b: ModelPick | null | undefined) =>
   !!a && !!b && a.engine === b.engine && a.model === b.model;
@@ -149,7 +157,7 @@ export function agentChoices(engines?: readonly EngineRow[]): { id: Harness; lab
   const rows = engines ?? [];
   if (rows.length < 2) return [];
   return rows
-    .filter((e) => e.id === 'claude' || e.id === 'codex')
+    .filter((e) => e.id === 'ompk' || e.id === 'claude' || e.id === 'codex')
     .map((e) => ({ id: e.id as Harness, label: e.label }));
 }
 
@@ -177,7 +185,11 @@ export function harnessFields({ engine, model, effort, engineCount, codexDefault
 }): { engine?: string; model?: string; effort?: string } {
   const named = engine === 'codex'
     ? (engineModelPicked('codex', model, codexDefault) ? { model } : {})
-    : { model: model || DEFAULT_MODEL };
+    : engine === 'ompk'
+      // ompk takes a model only when she names one; '' and nothing sent are
+      // its own configured model, which no picker row claims to know.
+      ? (model ? { model } : {})
+      : { model: model || DEFAULT_MODEL };
   return {
     ...(engineCount > 1 ? { engine } : {}),
     ...named,

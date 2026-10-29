@@ -2535,20 +2535,21 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   /* THE MENU'S OWN FACTS, worked out the way the new thread card works them
      out, from the same pure rules, so the two boxes cannot offer different
      lists (../threads/composer-rules.ts). */
-  const engineRows = engines?.length ? engines : [ENGINES[0]];
+  const engineRows = engines?.length ? engines : [ENGINES.find((e) => e.id === DEFAULT_ENGINE) ?? ENGINES[0]];
   const codexOffered = engineRows.some((e) => e.id === 'codex');
   const claudeOffered = engineRows.some((e) => e.id === 'claude');
+  const ompkOffered = engineRows.some((e) => e.id === 'ompk');
   const modelOpts = { codexModels, codexDefault: codexModelDefault };
   // The agent the row runs on now, as main resolved it, and the one the menu
   // is showing, which is the same until she picks the other.
-  const engineNow: Harness = (runningEngine === 'codex' ? 'codex' : 'claude');
-  const engineShown: Harness = engineChosen === 'codex' ? 'codex' : engineChosen === 'claude' ? 'claude' : engineNow;
+  const engineNow: Harness = (runningEngine === 'codex' ? 'codex' : runningEngine === 'ompk' ? 'ompk' : 'claude');
+  const engineShown: Harness = engineChosen === 'codex' ? 'codex' : engineChosen === 'ompk' ? 'ompk' : engineChosen === 'claude' ? 'claude' : engineNow;
   const pick: ModelPick = { engine: engineShown, model: model ?? defaultModelFor(engineShown, codexModelDefault) };
   const recent = useMemo(
-    () => recentModels(items, { codexModels, codexDefault: codexModelDefault, codexOffered, claudeOffered }),
-    [items, codexModels, codexModelDefault, codexOffered, claudeOffered],
+    () => recentModels(items, { codexModels, codexDefault: codexModelDefault, codexOffered, claudeOffered, ompkOffered }),
+    [items, codexModels, codexModelDefault, codexOffered, claudeOffered, ompkOffered],
   );
-  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered }), [codexModels, codexOffered, claudeOffered]);
+  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered, ompkOffered }), [codexModels, codexOffered, claudeOffered, ompkOffered]);
   const effortRows = effortChoicesFor(engineShown, pick.model, modelOpts);
   const effortLit = effortShown(effort, effortRows, defaultEffortFor(engineShown, pick.model, modelOpts));
   // A LEVEL BELONGS TO THE MODEL IT WAS PICKED FOR, so crossing to the other
@@ -2619,7 +2620,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   const [nativeNames, setNativeNames] = useState<string[]>([]);
   // While the box starts with a slash, not only while the menu is open: once
   // she types past /loop the box still has to know /loop is a command.
-  const discoveringCommands = !item.agent && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
+  const discoveringCommands = !item.agent && ((runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE || runningEngine === 'ompk') && text.startsWith('/');
   useEffect(() => {
     setNativeNames([]);
     if (!discoveringCommands) return;
@@ -2794,6 +2795,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
      through both still set a permission mode. Everything below reads this const,
      so the next control cannot be taught separately from the rest. */
   const claudeCode = (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;
+  const ompk = runningEngine === 'ompk';
   // No mode control at all on an external agent row: the value would be thrown
   // away by the send. See the note where the chip used to stand, in the footer.
   //
@@ -2838,19 +2840,20 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
      six modes: `/context` is not a word Codex knows, and `--permission-mode` is
      not a flag it takes. On a Codex row this list is empty and `slashOpen`
      below is therefore false, which is the whole of the behaviour. */
-  const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);
+  const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames, runningEngine);
   // OPENED BY THE SLASH AND BY NOTHING ELSE, since 2026-08-26. It used to open
   // from the footer chip too; the chip is gone (see the note where it stood)
   // and with it went `chipOpen` and the click-away that shut it.
   const slashOpen = menuRows.length > 0;
   // The command waiting on her words, once Enter has put it in the box.
-  const holding = !item.agent ? commandBeingWritten(text, claudeCode, nativeNames) : null;
+  const holding = !item.agent ? commandBeingWritten(text, claudeCode, nativeNames, runningEngine ?? null) : null;
   // WHAT THIS SEND WILL ACTUALLY RUN AS: the mode picked for this one message
   // if there is one, otherwise whatever the fleet is set to. Never a guess and
   // never a blank: a footer that says nothing when nothing is picked is the
   // footer she could not find.
-  const running: PermissionMode | CodexModeId = mode
-    ?? (claudeCode ? (runningMode ?? 'auto') : CODEX_DEFAULT_MODE);
+  const running: PermissionMode | CodexModeId | 'own' = mode === 'plan' || !ompk
+    ? (mode ?? (claudeCode ? (runningMode ?? 'auto') : CODEX_DEFAULT_MODE))
+    : 'own';
   // The level this thread is set to, for the footer, or null when it is set to
   // nothing and the engine is choosing.
   const levelSaid = effortSaid({ model, effort }, { engine: runningEngine, codexModels, codexDefault: codexModelDefault });
@@ -2858,9 +2861,11 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // not the first render reporting that it is shut.
   const drawerWasOpen = useRef(false);
   /** What the chip and the toast say, in whichever engine's words this row is. */
-  const statusOf = (m: PermissionMode | CodexModeId) => (claudeCode
-    ? MODE_STATUS[m as PermissionMode]
-    : CODEX_MODE_STATUS[m as CodexModeId]);
+  const statusOf = (m: PermissionMode | CodexModeId | 'own') => (ompk
+    ? (m === 'plan' ? MODE_STATUS.plan : "ompk's own mode")
+    : claudeCode
+      ? MODE_STATUS[m as PermissionMode]
+      : CODEX_MODE_STATUS[m as CodexModeId]);
   // The cursor goes back to the top whenever the list changes underneath it,
   // because row three of four is row three of nothing once the query narrows
   // the list to two.
@@ -2895,7 +2900,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
        somebody is actually asking, which is what this send will do. `running`
        resolves to the project's own value the moment `mode` is null. */
     if (m === null) {
-      onNotice(`Permissions · back to this project's setting, ${statusOf(claudeCode ? (runningMode ?? 'auto') : CODEX_DEFAULT_MODE)}`);
+      onNotice(ompk
+        ? "Permissions · back to ompk's own mode"
+        : `Permissions · back to this project's setting, ${statusOf(claudeCode ? (runningMode ?? 'auto') : CODEX_DEFAULT_MODE)}`);
       return;
     }
     onNotice(`Permissions · ${statusOf(m)} for this thread`);
@@ -2935,7 +2942,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // are sent to the agent as text.
   const changeText = (next: string) => {
     const q = canSetMode && next.startsWith('/') && next.endsWith(' ') ? next.slice(1, -1).toLowerCase() : null;
-    const hit = claudeCode ? exactMode(q) : exactCodexMode(q);
+    const hit = ompk ? (q === 'plan' ? 'plan' : null) : claudeCode ? exactMode(q) : exactCodexMode(q);
     if (hit) { pickMode(hit); return; }
     /*
      * AND `/clear ` TYPED STRAIGHT THROUGH, on the same terms as the six modes:
@@ -3010,7 +3017,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     }
     if (e.key === 'Tab' && e.shiftKey && canSetMode) {
       e.preventDefault();
-      const next = claudeCode ? nextMode(running as PermissionMode) : nextCodexMode(running as CodexModeId);
+      const next = ompk ? (mode === 'plan' ? null : 'plan') : claudeCode ? nextMode(running as PermissionMode) : nextCodexMode(running as CodexModeId);
       setMode(next);
       // AND IT SAYS SO OUT LOUD NOW. Cycling used to be readable off the
       // chip in the footer, which is where somebody's eye already was.
@@ -3275,10 +3282,12 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
               <ModePicker
                 label="What this message may do"
                 value={running}
-                options={claudeCode
-                  ? MODE_ORDER.map((m) => ({ value: m, label: MODE_WORDS[m] }))
-                  : CODEX_MODE_ORDER.map((m) => ({ value: m, label: CODEX_MODES[m].label }))}
-                onChange={(v) => pickMode(v as PermissionMode | CodexModeId)}
+                options={ompk
+                  ? [{ value: 'plan', label: 'Plan' }, { value: 'own', label: "ompk's own" }]
+                  : claudeCode
+                    ? MODE_ORDER.map((m) => ({ value: m, label: MODE_WORDS[m] }))
+                    : CODEX_MODE_ORDER.map((m) => ({ value: m, label: CODEX_MODES[m].label }))}
+                onChange={(v) => pickMode(v === 'own' ? null : v as PermissionMode | CodexModeId)}
               />
               {' Mode. '}
             </>

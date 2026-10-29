@@ -88,6 +88,10 @@ export function createAcpClient({
   onPermission = null,
   permissionTimeoutMs = PERMISSION_TIMEOUT_MS,
   requestTimeoutMs = REQUEST_TIMEOUT_MS,
+  // A turn is not a handshake: it runs as long as the work does, and the
+  // supervisor, not this wire, is what stops a run. Callers driving real
+  // turns pass their own; null keeps the request deadline for everything.
+  promptTimeoutMs = null,
   maxFrameLength = MAX_FRAME_LENGTH,
   stderrLimit = 64 * 1024,
 } = {}) {
@@ -120,14 +124,14 @@ export function createAcpClient({
     return true;
   }
 
-  function request(method, params) {
+  function request(method, params, timeoutMs = requestTimeoutMs) {
     if (gone) return Promise.reject(Error(gone));
     const id = nextId++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pending.delete(id);
-        reject(Error(`${method} did not answer within ${requestTimeoutMs}ms`));
-      }, requestTimeoutMs);
+        reject(Error(`${method} did not answer within ${timeoutMs}ms`));
+      }, timeoutMs);
       timer.unref?.();
       pending.set(id, { resolve, reject, timer, method });
       if (!write({ jsonrpc: '2.0', id, method, params })) {
@@ -274,7 +278,9 @@ export function createAcpClient({
       return request('session/load', { sessionId, cwd, mcpServers });
     },
     prompt: ({ sessionId, text, blocks = null }) =>
-      request('session/prompt', { sessionId, prompt: blocks ?? [{ type: 'text', text }] }),
+      request('session/prompt', { sessionId, prompt: blocks ?? [{ type: 'text', text }] }, promptTimeoutMs ?? requestTimeoutMs),
+    /** Plan, and only a mode the caller already knows this agent has. */
+    setMode: (sessionId, modeId) => request('session/set_mode', { sessionId, modeId }),
     /**
      * Stop the turn, and answer what it was parked on. The protocol says a
      * cancelled turn MUST be answered `cancelled`, and this is the only place

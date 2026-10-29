@@ -414,7 +414,7 @@ export const fixtureSnapshot: Snapshot = {
   // THE SECOND ENGINE IS A URL MODIFIER, NOT A NEW DEFAULT. See
   // `fixtureSecondEngine` below for the three other machines and for why the
   // one she has is the one you get for free.
-  engines: { choices: [ENGINES[0]], workspace: DEFAULT_ENGINE, byItem: {} },
+  engines: { choices: [ENGINES.find((e) => e.id === DEFAULT_ENGINE) ?? ENGINES[0]], workspace: DEFAULT_ENGINE, byItem: {} },
   config: {},
 };
 
@@ -890,7 +890,7 @@ export const fixtureSettings = {
     // promises, and because a key that is missing exercises the reader's
     // fallback instead of the payload the app really sends.
     engine: DEFAULT_ENGINE,
-    engineChoices: [ENGINES[0]],
+    engineChoices: [ENGINES.find((e) => e.id === DEFAULT_ENGINE) ?? ENGINES[0]],
     codexModels: [],
     codexModelDefault: null,
     codexModel: null,

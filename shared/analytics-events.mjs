@@ -68,7 +68,7 @@ export const ALLOWED_PROPS = new Set([
 // `kind` and `engine` are the properties that are not numbers, so each is a
 // closed list. A value outside it is dropped, not passed through.
 export const KINDS = new Set(['task', 'question', 'review', 'directive', 'agent', 'digest']);
-export const ENGINES = new Set(['claude', 'codex']);
+export const ENGINES = new Set(['ompk', 'claude', 'codex']);
 
 // Refuse an event nobody approved; drop a property nobody approved. Returns the
 // payload that may be sent, or null when the event itself is not one of hers.

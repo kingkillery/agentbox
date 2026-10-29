@@ -36,13 +36,13 @@ describe('the first screen while an agent is being installed', () => {
   // The boundary either side: nothing started, and something that stopped.
   it('asks for a choice when nothing has been started', () => {
     const gate = installGate(null);
-    expect(gate.heading).toBe('Install Claude Code or Codex to start');
+    expect(gate.heading).toBe('Install a coding agent to start');
     expect(gate.running).toBe(false);
   });
 
   it('gives the buttons back when an install fails, so the next press retries', () => {
     const gate = installGate({ engine: 'codex', phase: 'failed', error: 'npm exited 1' });
-    expect(gate.heading).toBe('Install Claude Code or Codex to start');
+    expect(gate.heading).toBe('Install a coding agent to start');
     expect(gate.running).toBe(false);
   });
 

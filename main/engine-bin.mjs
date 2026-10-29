@@ -128,6 +128,29 @@ function engine({ bin, name, installUrl, ownPaths, appCopies = () => [], evidenc
 
 export const ENGINES = {
   /**
+   * ompk (oh-my-pk) leads this registry as it leads the picker in this fork.
+   * It is optional all the same: an absence is the ordinary case and never a
+   * warning. Its installer puts Bun in place and installs the npm package
+   * with it, so the binary's own homes are Bun's bin and the usual local bin.
+   * `~/.ompk/agent` is where it keeps its sessions and its own sign-in
+   * (`auth.json`, written by ompk itself and never read here beyond its
+   * existence).
+   */
+  ompk: engine({
+    bin: 'ompk',
+    name: 'ompk',
+    installUrl: 'https://oh-my-pk.pkking.computer',
+    ownPaths: (home) => [
+      path.join(home, '.bun/bin/ompk'),
+      path.join(home, '.local/bin/ompk'),
+    ],
+    evidence: (home) => [
+      path.join(home, '.ompk/agent/auth.json'),
+      path.join(home, '.ompk/agent'),
+      path.join(home, '.ompk'),
+    ],
+  }),
+  /**
    * Claude Code is required: the app will not open an inbox without it.
    *
    * The Claude desktop app keeps its own copy, one folder per version, and it

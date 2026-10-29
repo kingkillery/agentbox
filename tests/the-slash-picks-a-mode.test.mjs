@@ -403,7 +403,7 @@ describe('one vocabulary, not three', () => {
     // The slash pick.
     expect(src).toMatch(/const pickMode = \(m: PermissionMode \| CodexModeId \| null\) => \{\s*setMode\(m\);\s*announce\(m\);/);
     // And Claude Code's own Shift+Tab.
-    expect(src).toMatch(/const next = claudeCode \? nextMode\(running as PermissionMode\) : nextCodexMode\(running as CodexModeId\);\s*setMode\(next\);[\s\S]{0,400}?announce\(next\);/);
+    expect(src).toMatch(/const next = ompk \? \(mode === 'plan' \? null : 'plan'\) : claudeCode \? nextMode\(running as PermissionMode\) : nextCodexMode\(running as CodexModeId\);\s*setMode\(next\);[\s\S]{0,400}?announce\(next\);/);
   });
 });
 
@@ -549,7 +549,7 @@ describe('the way back', () => {
      both set a permission mode there anyway. Same rule as the paragraph above,
      one level up: the list and the KEYS have to be decided off one answer. */
   it('decides open-or-shut off the same rows it draws', () => {
-    expect(focus).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);');
+    expect(focus).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames, runningEngine);');
     expect(focus).toContain('const slashOpen = menuRows.length > 0;');
     expect(focus).not.toContain('const slashRows =');
   });

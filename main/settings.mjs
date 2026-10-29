@@ -40,6 +40,7 @@ import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-p
 import { isPackagedElectron } from './team/session.mjs';
 import { claudeModels } from './claude-models.mjs';
 import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mjs';
+import { forgetOmpkBin, INSTALL_URL as OMPK_INSTALL_URL } from './ompk-bin.mjs';
 
 // Her Claude Code sessions in her inbox: all of them, only the ones stopped on
 // a question, or none. One reader, here, so the settings screen and the
@@ -266,6 +267,15 @@ function knownEngine(config, engine) {
       from: config.claudeBinConfigured ? 'settings' : (config.claudeFrom ?? null),
     };
   }
+  if (engine === 'ompk') {
+    // The path is the answer, as Codex's is: recheckOmpk moves ompkBin.
+    return {
+      path: config.ompkBin ?? null,
+      found: !!config.ompkBin,
+      certain: config.ompkCertain !== false,
+      from: config.ompkBinConfigured ? 'settings' : (config.ompkFrom ?? null),
+    };
+  }
   // recheckCodex moves codexBin and not codexFound, so the path is the answer.
   return {
     path: config.codexBin ?? null,
@@ -312,7 +322,7 @@ export function recheckClaude(config) {
  */
 export async function lookAgainFor(engine, config) {
   await lookAgain(engine);
-  return engine === 'claude' ? takeClaude(config) : takeCodex(config);
+  return engine === 'claude' ? takeClaude(config) : engine === 'ompk' ? takeOmpk(config) : takeCodex(config);
 }
 
 function takeClaude(config) {
@@ -407,6 +417,46 @@ function takeCodex(config) {
   return state;
 }
 
+/**
+ * THE SAME THREE FACTS ABOUT ompk, read exactly as `codexState` reads
+ * Codex's: this fork's premier engine is still an optional binary on the
+ * machine, absent from most, and its page has to be able to say "not here,
+ * and here is where it lives" on a Mac that has never heard of it.
+ * `signedIn` rides along because ompk's page has no account tile to carry
+ * it: the sign-in is one file in ompk's own home, and the harness reads
+ * only that it holds something.
+ */
+export function ompkState(config, where = {}, { search = true } = {}) {
+  const found = search ? harnessFor('ompk').discover(config.ompkBinConfigured ?? null, where) : knownEngine(config, 'ompk');
+  return {
+    bin: found.found ? (found.path ?? '') : '',
+    found: found.found,
+    certain: found.certain !== false,
+    url: OMPK_INSTALL_URL,
+    chosen: found.from === 'settings',
+    signedIn: found.found ? harnessFor('ompk').signedIn() : false,
+  };
+}
+
+/** `ompkState` under the names the walk's last card reads beside the others. */
+export function ompkFoundState(config, where = {}, how = {}) {
+  const state = ompkState(config, where, how);
+  return { ompkFound: state.found, ompkCertain: state.certain, ompkInstallUrl: state.url };
+}
+
+/** LOOK AGAIN, PROPERLY, for ompk. The twin of `recheckCodex` above. */
+export function recheckOmpk(config) {
+  forgetOmpkBin();
+  return takeOmpk(config);
+}
+
+function takeOmpk(config) {
+  const state = ompkState(config);
+  config.ompkBin = state.found ? state.bin : null;
+  config.ompkCertain = state.certain;
+  return state;
+}
+
 /* ------------------- POINTING AT IT YOURSELF, AND BACK -------------------- */
 /**
  * THE WAY OUT OF A SEARCH THAT MISSED, AND IT IS NOT A RELEASE (w-ce8c1a9275).
@@ -434,7 +484,8 @@ function takeCodex(config) {
  * open panel itself produced. The sibling rule is
  * tests/where-codex-runs-from-is-not-a-file-a-worker-can-write.test.mjs.
  */
-const BIN_KEY = { claude: 'claudeBin', codex: 'codexBin' };
+const BIN_KEY = { ompk: 'ompkBin', claude: 'claudeBin', codex: 'codexBin' };
+const recheckBin = (config, engine) => (engine === 'claude' ? recheckClaude(config) : engine === 'ompk' ? recheckOmpk(config) : recheckCodex(config));
 
 /** The sentence, or null when the file really is one we could run. */
 function whyNotAnAgent(chosen) {
@@ -468,7 +519,7 @@ export function pointAtEngineBin(config, engine, chosen) {
   if (!config.appDir) return { ok: false, say: `${Name} has nowhere to save that.` };
   saveConfig(config, { [key]: chosen });
   config[`${engine}BinConfigured`] = chosen;
-  const state = engine === 'claude' ? recheckClaude(config) : recheckCodex(config);
+  const state = recheckBin(config, engine);
   return { ok: true, state };
 }
 
@@ -484,7 +535,7 @@ export function searchForEngineBin(config, engine) {
   if (!config.appDir) return { ok: false, say: `${Name} has nowhere to save that.` };
   saveConfig(config, { [key]: undefined });
   config[`${engine}BinConfigured`] = null;
-  const state = engine === 'claude' ? recheckClaude(config) : recheckCodex(config);
+  const state = recheckBin(config, engine);
   return { ok: true, state };
 }
 
@@ -740,6 +791,9 @@ export function readSettings({ config, supervisor, store }, { search = true } = 
       // both: the last card of the walk only shuts the inbox when neither is
       // here (renderer/src/App.tsx).
       ...codexFoundState(config, {}, { search }),
+      // AND WHETHER ompk IS, for the same card: in this fork a Mac whose only
+      // coding agent is ompk has one, whatever the other two say.
+      ...ompkFoundState(config, {}, { search }),
       // AND WHAT THIS MAC'S CLAUDE CODE CALLS ITS MODELS.
       //
       // In the same trip, and for the same reason the line above is looked up
@@ -827,14 +881,22 @@ function engineSettings(supervisor, config, { search = true } = {}) {
     // means.
     accounts: codexAccountRows(supervisor),
   };
+  // ompk BESIDE CODEX, ON THE SAME TERMS: its three facts and whether its own
+  // home holds a sign-in. No accounts and no model list, because there is one
+  // sign-in and the models are ompk's own (main/harnesses/ompk.mjs).
+  const ompk = {
+    ...ompkState(config, {}, { search }),
+    trouble: engineTroubleFor(supervisor, 'ompk'),
+  };
   if (choices.length < 2 && !codexIsHome) {
-    return { engine, engineChoices: choices, codex, codexModels: [], codexModelDefault: null, codexModel: null };
+    return { engine, engineChoices: choices, ompk, codex, codexModels: [], codexModelDefault: null, codexModel: null };
   }
   const home = supervisor._codexHome();
   const offered = supervisor._codexOfferHomes();
   return {
     engine,
     engineChoices: choices,
+    ompk,
     codex,
     // WITH EACH MODEL'S OWN REASONING LEVELS. They differ per model, and the
     // strip in the model drawer draws the picked model's list, so they travel

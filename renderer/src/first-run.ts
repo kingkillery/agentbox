@@ -9,7 +9,7 @@ import { shortPath } from './onboarding';
 
 export type Step = 'chats' | 'task' | 'where';
 export type Screen = 'welcome' | Step;
-export type Engine = 'claude' | 'codex';
+export type Engine = 'ompk' | 'claude' | 'codex';
 
 /** The number each screen is counted under as `first_run_step`. In the twenties
  *  because the walk this replaced counted 1 to 15 (BEAT in ./onboarding.ts). */
@@ -22,10 +22,10 @@ export function previousScreen(screen: Screen, { chats }: { chats: number }): Sc
 }
 
 export function readyEngines(readings: Array<{ engine: Engine; found?: boolean; signedIn?: boolean } | null>): Engine[] {
-  return (['claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && r.signedIn));
+  return (['ompk', 'claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && r.signedIn));
 }
 
-export const ENGINE_NAME: Record<Engine, string> = { claude: 'Claude Code', codex: 'Codex' };
+export const ENGINE_NAME: Record<Engine, string> = { ompk: 'ompk', claude: 'Claude Code', codex: 'Codex' };
 
 export type EngineSetup = { engine: Engine; phase: string; error?: string | null } | null;
 
@@ -33,14 +33,14 @@ export type EngineSetup = { engine: Engine; phase: string; error?: string | null
  * THE FIRST SCREEN WHILE AN AGENT IS BEING INSTALLED (F-145).
  *
  *  The heading is the only line on that screen anybody reads, so it is the one
- *  that has to change: leaving it on "Install Claude Code or Codex to start"
+ *  that has to change: leaving it on "Install a coding agent to start"
  *  for the length of an install told a tester to press again. `running` holds
  *  both buttons, including the other agent's, because installing two at once
  *  is not something anybody asked for and the footer can only report one.
  */
 export function installGate(setup: EngineSetup): { heading: string; running: boolean } {
   const running = !!setup && ['installing', 'checking', 'signing-in'].includes(setup.phase);
-  if (!running) return { heading: 'Install Claude Code or Codex to start', running: false };
+  if (!running) return { heading: 'Install a coding agent to start', running: false };
   const named = ENGINE_NAME[setup!.engine];
   return {
     heading: setup!.phase === 'signing-in' ? `Finish signing in to ${named} in your browser` : `Installing ${named}`,

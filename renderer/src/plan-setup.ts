@@ -13,8 +13,8 @@
 
 import { NAME } from '../../shared/product-name.mjs';
 
-export type Engine = 'claude' | 'codex';
-export type Plan = 'claude' | 'codex' | 'both';
+export type Engine = 'ompk' | 'claude' | 'codex';
+export type Plan = 'ompk' | 'claude' | 'codex' | 'both';
 export type Phase = 'idle' | 'checking' | 'installing' | 'signing-in' | 'ready' | 'failed';
 
 export interface EngineSetupState {
@@ -35,8 +35,10 @@ export interface EngineSetupState {
 }
 
 export const COPY = {
-  planHead: 'Which AI plan do you pay for?',
-  planLede: `Your agents run on your own plan. Pick it and ${NAME} sets everything up.`,
+  planHead: 'Which AI do you run agents on?',
+  planLede: `Your agents run on your own sign-in. Pick it and ${NAME} sets everything up.`,
+  ompk: 'ompk',
+  ompkPlans: 'Your own providers, one sign-in',
   claude: 'Claude',
   claudePlans: 'Pro, Max or a team plan',
   chatgpt: 'ChatGPT',
@@ -62,7 +64,7 @@ export const COPY = {
   notThatOne: 'That is not something agents can run. Try another, or pick a plan above.',
   checking: 'Checking this computer…',
   nothingHere: 'Nothing is set up on this computer yet. Pick the plan you pay for above.',
-  privacy: `You sign in on Claude's or OpenAI's own page. ${NAME} never sees your password.`,
+  privacy: `You sign in on the tool's own page or its own setup. ${NAME} never sees your password.`,
 
   /*
    * THE OTHER HALF OF THIS SCREEN (w-e217e577e5). A computer with a plan
@@ -84,24 +86,26 @@ export const COPY = {
    * its second sentence: there is one sign-in left on this screen rather than
    * a whole setup, and the row it belongs to is the one with no tick.
    */
-  foundNote: "You sign in on Claude's or OpenAI's own page.",
+  foundNote: "You sign in on the tool's own page or its own setup.",
   /** The same screen with nothing signed in: no plan to claim yet, and the
-   *  next press opens a browser, which it has to say before one opens. */
-  foundOut: 'Pick the plan you pay for. Signing in opens a page in your browser.',
+   *  next press opens a sign-in, which it has to say before one opens. */
+  foundOut: 'Pick what your agents run on. Signing in opens its own page in your browser, or its own setup.',
   /** And its own heading: this screen drew "Found on this computer." over that
    *  lede, which is the two halves of one screen contradicting each other. */
   foundOutHead: 'No plan is signed in yet.',
 
   setupHead: (name: string) => `Setting up ${name}.`,
-  setupLedeWait: 'One step needs you: approve the sign-in in your browser.',
+  setupLedeWait: 'One step needs you: finish the sign-in where it opened.',
   setupLedeBusy: 'This takes about half a minute. Nothing needs you yet.',
   setupLedeFailed: 'Something stopped the setup. Try again, or skip it for now.',
   setupOf: (n: number, of: number) => `${n} of ${of}`,
   install: (tool: string) => `Install ${tool}`,
   /** The same row when nothing was installed because it was already here. */
   found: (tool: string) => `Found ${tool}`,
-  signInStep: (name: string) => `Sign in to your ${name} plan`,
-  signInSub: (name: string) => `A ${name === 'Claude' ? 'Claude' : 'ChatGPT'} page opened in your browser. Click Authorize there, then come back here.`,
+  signInStep: (name: string) => `Sign in to ${name}`,
+  signInSub: (name: string) => name === 'ompk'
+    ? 'ompk\'s own setup opened in the app terminal. Answer it there, then come back here.'
+    : `A ${name === 'Claude' ? 'Claude' : 'ChatGPT'} page opened in your browser. Click Authorize there, then come back here.`,
   ready: 'Check that agents can start',
   done: 'Done',
   working: 'Working…',
@@ -128,12 +132,12 @@ export const COPY = {
 
 /** The plan's name, the word on screen. Never "Claude Code" or "Codex" here. */
 export function planName(engine: Engine): string {
-  return engine === 'claude' ? COPY.claude : COPY.chatgpt;
+  return engine === 'ompk' ? COPY.ompk : engine === 'claude' ? COPY.claude : COPY.chatgpt;
 }
 
 /** The tool's name, only where a tool is really being installed. */
 export function toolName(engine: Engine): string {
-  return engine === 'claude' ? 'Claude Code' : 'Codex';
+  return engine === 'ompk' ? 'ompk' : engine === 'claude' ? 'Claude Code' : 'Codex';
 }
 
 /** Which tools a plan sets up, in the order they are set up. */
@@ -183,8 +187,8 @@ export function planBar(readings: BarReading[]): BarWords | null {
   const button = (engine: Engine) => ({ plan: engine as Plan, label: word(engine) });
   // Only one on the disk can lead on being there, and only then can the
   // sentence name the one plan that is a sign-in away.
-  const lead = here.length === 1 ? here[0] : 'claude';
-  const other: Engine = lead === 'claude' ? 'codex' : 'claude';
+  const lead = here.length === 1 ? here[0] : 'ompk';
+  const other: Engine = lead === 'ompk' ? 'claude' : lead === 'claude' ? 'codex' : 'claude';
   return {
     say: here.length === 1 ? COPY.barSignedOut(planName(lead)) : COPY.barSay,
     first: button(lead),
@@ -299,6 +303,7 @@ export interface AskRow {
  */
 export function planRows(): AskRow[] {
   return [
+    { ...PLAN_ROW.ompk },
     { ...PLAN_ROW.claude },
     { ...PLAN_ROW.codex },
     { key: 'both', plan: 'both', mark: '+', name: COPY.both, sub: COPY.bothPlans },
@@ -317,15 +322,15 @@ const SKIP_ROW: AskRow = { key: 'skip', name: COPY.notNow, other: true };
  *  found are the same row with different words at its right edge.
  */
 const PLAN_ROW: Record<Engine, AskRow> = {
+  ompk: { key: 'ompk', plan: 'ompk', mark: 'O', name: COPY.ompk, sub: COPY.ompkPlans },
   claude: { key: 'claude', plan: 'claude', mark: 'C', name: COPY.claude, sub: COPY.claudePlans },
   codex: { key: 'codex', plan: 'codex', mark: 'G', name: COPY.chatgpt, sub: COPY.chatgptPlans },
 };
 
 type Reading = Pick<EngineSetupState, 'engine' | 'found' | 'signedIn'>;
 
-/** The plans that can run an agent right now, in the order they are asked in. */
 export function readyEngines(readings: Reading[]): Engine[] {
-  return (['claude', 'codex'] as Engine[]).filter((e) => {
+  return (['ompk', 'claude', 'codex'] as Engine[]).filter((e) => {
     const r = readings.find((x) => x.engine === e);
     return !!r?.found && !!r?.signedIn;
   });
@@ -350,10 +355,12 @@ export function foundLede(ready: Engine[]): string | null {
   if (!ready.length) return null;
   const names = ready.map(planName);
   if (ready.length > 1) return `Your agents will run on your own ${names.join(' and ')} plans.`;
-  // AND THE OTHER ROW IS ANSWERED TOO (w-04e8d6d6e6). The screen says it
+  // AND THE OTHER PLAN IS ANSWERED TOO (w-04e8d6d6e6). The screen says it
   // found one plan and then draws the other one under it offering to set it
   // up, with nothing saying whether that one was looked for. A tester with
-  // ChatGPT signed in read the Claude row as something still to do.
+  // ChatGPT signed in read the Claude row as something still to do. ompk is
+  // not in this sentence because it is not a plan somebody else pays for:
+  // nobody needs it "as well" to run what already runs.
   const other = (['claude', 'codex'] as Engine[]).find((e) => !ready.includes(e));
   const sentence = `Your agents will run on your own ${names[0]} plan.`;
   return other ? `${sentence} You do not need ${planName(other)} as well.` : sentence;
@@ -369,11 +376,15 @@ export function foundLede(ready: Engine[]): string | null {
  *
  *  THE WAY OUT IS HERE ONLY WHEN NOTHING CAN RUN YET. With a plan signed in the
  *  ticked row IS the way on, and a second word for the same press is a choice
- *  nobody has to make.
  */
 export function foundRows(readings: Reading[]): AskRow[] {
   const ready = readyEngines(readings);
-  const plans = (['claude', 'codex'] as Engine[]).map((e) => {
+  // A ROW PER ENGINE THE COMPUTER WAS ASKED ABOUT, rather than all three
+  // always: the found screen says what is true of what is here, and an ompk
+  // row saying "Set up" on a Mac that was never probed for it would be a
+  // claim nobody made. The probe asks all three, so every row is real.
+  const probed = (['ompk', 'claude', 'codex'] as Engine[]).filter((e) => readings.some((x) => x.engine === e));
+  const plans = probed.map((e) => {
     const r = readings.find((x) => x.engine === e);
     const isReady = ready.includes(e);
     return {

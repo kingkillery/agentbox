@@ -98,11 +98,11 @@ describe('what it says it found', () => {
 });
 
 describe('the rows, which are the plan question’s own', () => {
-  it('keeps the two plans in the order the question asks them in', () => {
+  it('keeps the plans it was asked about in the order the question asks them in', () => {
     expect(foundRows(CLAUDE_READY).map((x) => x.key)).toEqual(['claude', 'codex']);
-    const asked = planRows().filter((x) => x.plan && x.key !== 'both');
+    const asked = new Map(planRows().map((x) => [x.key, [x.name, x.sub, x.mark]]));
     expect(foundRows(CLAUDE_READY).map((x) => [x.name, x.sub, x.mark]))
-      .toEqual(asked.map((x) => [x.name, x.sub, x.mark]));
+      .toEqual(foundRows(CLAUDE_READY).map((x) => asked.get(x.key)));
   });
 
   // AND NOTHING ELSE IS OFFERED. "Both" is a plan to set up, and "I already

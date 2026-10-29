@@ -172,6 +172,9 @@ contextBridge.exposeInMainWorld('zero', {
   // it is also what makes the Coding agent row appear, because the path the
   // search lands on is the one that row is drawn from.
   codexRecheck: () => ipcRenderer.invoke('zero:codex-recheck'),
+  // And for the premier coding agent in this fork, from the ompk card on
+  // Settings. What the search finds is what makes it the home engine.
+  ompkRecheck: () => ipcRenderer.invoke('zero:ompk-recheck'),
   // AND WHEN NEITHER SEARCH CAN FIND IT: point at the file yourself, or hand
   // the choice back so the search takes over again. `{ engine }` opens the
   // picker in main and applies what it produced in the same trip, so no path

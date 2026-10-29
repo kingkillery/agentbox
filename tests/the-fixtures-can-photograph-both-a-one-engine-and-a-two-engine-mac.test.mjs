@@ -48,7 +48,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EnginePicker } from '../renderer/src/components/EnginePicker.tsx';
-import { ENGINES } from '../shared/engines.mjs';
+import { ENGINES, DEFAULT_ENGINE } from '../shared/engines.mjs';
 import { codexModels as readCodexModels } from '../main/codex-models.mjs';
 import { engineModelChoices } from '../renderer/src/models.ts';
 import {
@@ -75,8 +75,11 @@ async function apiAt(search) {
 afterEach(() => { delete globalThis.location; });
 
 describe('the default fixture world is the Mac she has', () => {
+  // ONE CODING AGENT: the default engine's own row, which is ompk first only
+  // in the picker — the world itself runs Claude Code.
+  const home = [ENGINES.find((e) => e.id === DEFAULT_ENGINE)];
   it('offers one coding agent on the snapshot', () => {
-    expect(fixtureSnapshot.engines.choices).toEqual([ENGINES[0]]);
+    expect(fixtureSnapshot.engines.choices).toEqual(home);
     expect(fixtureSnapshot.engines.workspace).toBe('claude');
     expect(fixtureSnapshot.engines.byItem).toEqual({});
   });
@@ -85,7 +88,7 @@ describe('the default fixture world is the Mac she has', () => {
   // Codex is not here.
   it('offers one coding agent in settings, and says Codex is not on this Mac', () => {
     const w = fixtureSettings.workspace;
-    expect(w.engineChoices).toEqual([ENGINES[0]]);
+    expect(w.engineChoices).toEqual(home);
     expect(w.engine).toBe('claude');
     expect(w.codex).toMatchObject({ found: false, certain: true });
     expect(w.codexModels).toEqual([]);
@@ -118,8 +121,9 @@ describe('the default fixture world is the Mac she has', () => {
 describe('?engines=missing is the Mac the connection card was built for', () => {
   it('still offers one coding agent, so no picker is drawn anywhere', async () => {
     const api = await apiAt('?fixtures&engines=missing');
-    expect((await api.snapshot()).engines.choices).toEqual([ENGINES[0]]);
-    expect((await api.settings()).workspace.engineChoices).toEqual([ENGINES[0]]);
+    const home = [ENGINES.find((e) => e.id === DEFAULT_ENGINE)];
+    expect((await api.snapshot()).engines.choices).toEqual(home);
+    expect((await api.settings()).workspace.engineChoices).toEqual(home);
   });
 
   it('draws the card, saying Codex is not here', async () => {

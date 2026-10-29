@@ -125,7 +125,7 @@ describe('the composer asks which engine the row runs on, once', () => {
 
   it('reads that one answer from the mode rule and from the menu alike', () => {
     expect(composer).toContain('const canSetMode = !item.agent;');
-    expect(composer).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);');
+    expect(composer).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames, runningEngine);');
   });
 
   // THE LINE AS IT WAS, BY NAME, so this cannot go green against the old file.
@@ -178,7 +178,7 @@ describe("Claude Code's status line is not printed over a Codex row", () => {
     // empty and therefore never drawn.
     expect(composer).toMatch(/const pickMode = \(m: PermissionMode \| CodexModeId \| null\) => \{\s*setMode\(m\);\s*announce\(m\);/);
     // And Shift+Tab, which is guarded above.
-    expect(composer).toMatch(/const next = claudeCode \? nextMode\(running as PermissionMode\) : nextCodexMode\(running as CodexModeId\);\s*setMode\(next\);[\s\S]{0,400}?announce\(next\);/);
+    expect(composer).toMatch(/const next = ompk \? \(mode === 'plan' \? null : 'plan'\) : claudeCode \? nextMode\(running as PermissionMode\) : nextCodexMode\(running as CodexModeId\);\s*setMode\(next\);[\s\S]{0,400}?announce\(next\);/);
     // `pickMode` itself is CALLED from four places, and every one of them is
     // behind `canSetMode`: the menu row, an exact mode word typed through,
     // `/clear` typed through, and the word in the reply sentence, which is

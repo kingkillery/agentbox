@@ -205,14 +205,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // meaning what was actually recorded.
   const answerApproval = (id, allow, note) => {
     const shown = approvals.cardShown(config.storeRoot, id);
-    if (allow && supervisor.codexCardChanged?.(id, shown)) {
+    if (allow && (supervisor.codexCardChanged?.(id, shown) || supervisor.acpCardChanged?.(id, shown))) {
       console.warn(`zero: approval ${id} was drawn from a request that has since been rewritten; the founder's Allow was for a different card and nothing has been allowed`);
       allow = false;
       note = CARD_CHANGED;
     }
     const ok = approvals.answer(config.storeRoot, id, allow, note);
     if (!ok) { allow = false; note = SPOOL_REFUSED; }
-    const settled = supervisor.settleCodexApproval?.(id, allow, note) ?? false;
+    const settled = (supervisor.settleCodexApproval?.(id, allow, note) ?? false)
+      || (supervisor.settleAcpApproval?.(id, allow, note) ?? false);
     if (!ok && settled) console.warn(`zero: approval ${id} could not be recorded in the spool; the worker waiting on it has been denied`);
     if ((ok || settled) && !window.isDestroyed()) {
       window.webContents.send('zero:approval-answered', { id, allow: !!allow });
@@ -424,10 +425,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   ipcMain.handle('zero:agent-update',async(event,{engine,action}={})=>{
     if(event.senderFrame?.parent||(event.sender&&event.sender!==window.webContents))throw Error('Updates are only available in the main app window.');
-    if(!['claude','codex'].includes(engine))throw Error('Unknown agent.');
+    if(!['ompk','claude','codex'].includes(engine))throw Error('Unknown agent.');
     if(action==='check')return agentUpdates.check(engine);
     if(action==='recheck')return agentUpdates.check(engine,true);
     if(action==='start')return agentUpdates.start(engine);
+    if(action==='setup')return agentUpdates.setup(engine);
     if(action==='status')return agentUpdates.status(engine);
     if(action==='refresh'){await refreshAgentModels(engine,config,supervisor._codexOfferHomes());return true;}
     throw Error('Unknown update action.');
@@ -1669,6 +1671,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
 
+  // AND THE SAME BUTTON FOR ompk, from its own card on Settings, for the
+  // same reason Codex's earns its place: what the search finds lands on
+  // `config.ompkBin`, which is what makes ompk this Mac's home engine.
+  ipcMain.handle('zero:ompk-recheck', async () => {
+    try {
+      return { ok: true, workspace: await lookAgainFor('ompk', config) };
+    } catch (err) {
+      return { ok: false, error: String(err.message) };
+    }
+  });
+
   /*
    * AND WHEN NEITHER BUTTON CAN FIND IT: POINT AT THE FILE YOURSELF
    * (w-ce8c1a9275). The search asks the login shell first now, which covers
@@ -1690,7 +1703,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
    * as words the row prints, the way `zero:choose-folder` already does.
    */
   ipcMain.handle('zero:engine-bin', async (_e, { engine, action } = {}) => {
-    if (engine !== 'claude' && engine !== 'codex') return { ok: false, error: 'Unknown coding agent.' };
+    if (engine !== 'claude' && engine !== 'codex' && engine !== 'ompk') return { ok: false, error: 'Unknown coding agent.' };
     try {
       // Handing the choice back needs no panel: it is the row saying "look for
       // it again", and the search takes over from there.
@@ -1701,7 +1714,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       }
       const { dialog } = await import('electron');
       const r = await dialog.showOpenDialog(window, {
-        title: engine === 'codex' ? 'Where is Codex?' : 'Where is Claude Code?',
+        title: engine === 'codex' ? 'Where is Codex?' : engine === 'ompk' ? 'Where is ompk?' : 'Where is Claude Code?',
         buttonLabel: 'Use this one',
         properties: ['openFile', 'showHiddenFiles', 'treatPackageAsDirectory'],
       });
@@ -1727,6 +1740,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
         // nothing does not read as a computer with nothing on it.
         claude: async () => { const s = await lookAgainFor('claude', config); return { found: s.claudeFound, path: s.claudeBin, certain: s.claudeCertain }; },
         codex: async () => { const s = await lookAgainFor('codex', config); return { found: s.found, path: s.bin, certain: s.certain }; },
+        ompk: async () => { const s = await lookAgainFor('ompk', config); return { found: s.found, path: s.bin, certain: s.certain }; },
       };
       return finders[engine]?.() ?? { found: false, path: null };
     },
@@ -1734,6 +1748,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // (`Supervisor#_enginesFound`) and never saved: it changes outside the app.
     onSignIn: (engine, signedIn) => {
       config[`${engine}SignedIn`] = signedIn;
+    },
+    // ompk's sign-in is its own terminal wizard, which the engine setup
+    // delegates to the app's update terminal so somebody can actually answer
+    // it; a PTY nobody can see is a wizard nobody can finish.
+    open: (engine) => {
+      void agentUpdates.setup(engine).catch(() => {});
+      const session = agentUpdates.terminals.sessions.get(engine);
+      return session ? { exit: session.exitPromise.then(() => {}), kill: () => agentUpdates.terminals.close(engine) } : null;
     },
   });
   // ASKED ONCE AT LAUNCH, and only on a Mac with both, which is the only Mac
@@ -1744,8 +1766,12 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     void engineSetup.signedInNow('claude', config.claudeBin);
     void engineSetup.signedInNow('codex', config.codexBin);
   }
+  // ompk's own sign-in read is in-process and cheap, so it is asked wherever
+  // ompk is here: a fresh sign-in from `ompk setup` in a terminal must move a
+  // task without a restart, exactly like the two above.
+  if (config.ompkBin) void engineSetup.signedInNow('ompk', config.ompkBin);
   // A sign-in left waiting on the browser is not left running after the app.
-  app.on('will-quit', () => { engineSetup.cancel('claude'); engineSetup.cancel('codex'); });
+  app.on('will-quit', () => { engineSetup.cancel('claude'); engineSetup.cancel('codex'); engineSetup.cancel('ompk'); });
   ipcMain.handle('zero:engine-setup', async (_e, { action, engine } = {}) => {
     if (!isEngine(engine)) return { ok: false, error: 'Unknown coding agent.' };
     try {

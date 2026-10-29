@@ -147,8 +147,8 @@ describe('the rows the question is left with', () => {
   // AND THE WAY PAST IT (w-8656bdd97d). This screen had none, so a new user
   // who did not want to sign in right now was held on the walk's one
   // unskippable step; `PlanBar` on the inbox is where Not now comes back.
-  it('is the three plans, the one way out and the way past', () => {
-    expect(planRows().map((x) => x.key)).toEqual(['claude', 'codex', 'both', 'mine', 'skip']);
+  it('is the plans, the one way out and the way past', () => {
+    expect(planRows().map((x) => x.key)).toEqual(['ompk', 'claude', 'codex', 'both', 'mine', 'skip']);
   });
 
   // THE CASE THAT MUST NOT MATCH. "I am not sure, check this computer for me"

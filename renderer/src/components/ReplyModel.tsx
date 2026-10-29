@@ -23,7 +23,7 @@ export function ReplyModel({
   pick: ModelPick;
   onPick: (p: ModelPick) => void;
   recent: readonly ModelPick[];
-  every: { claude: readonly ModelPick[]; codex: readonly ModelPick[] };
+  every: { ompk?: readonly ModelPick[]; claude: readonly ModelPick[]; codex: readonly ModelPick[] };
   more: number;
   labelOf: (p: ModelPick) => string;
   engineLabel: (id: string) => string;

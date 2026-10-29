@@ -77,6 +77,9 @@ function sources(dir, out = []) {
  *  and those are the record of why a thing is the way it is. */
 function codeOnly(text) {
   return text
+    // LF WHAT GIT CHECKS OUT: on a CRLF working tree `.` cannot eat the \r
+    // and `$` does not match before it, so a // comment would keep its tail.
+    .replace(/\r\n/g, '\n')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .split('\n')
     .map((l) => l.replace(/(^|[^:"'`\\])\/\/.*$/, '$1'))

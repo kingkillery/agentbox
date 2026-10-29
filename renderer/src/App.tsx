@@ -1135,13 +1135,14 @@ export default function App() {
       // answer, or when this Mac shows signs of Claude Code that the search
       // could not turn into a path. Any of those means nothing may be said.
       const sure = s.ok !== false && s.workspace?.claudeCertain === true;
-      // AND CODEX IS ENOUGH ON ITS OWN. The card shuts the inbox only when we
-      // are sure of both: no Claude Code, and no Codex either.
+      // AND ompk OR CODEX IS ENOUGH ON ITS OWN. The card shuts the inbox only
+      // when we are sure of all three: no Claude Code, no Codex, and no ompk.
       const codexSure = s.ok !== false && s.workspace?.codexCertain === true;
+      const ompkSure = s.ok !== false && s.workspace?.ompkCertain === true;
       setClaude({
         missing: sure && !s.workspace?.claudeFound
-          && noCodingAgent({ found: false, certain: true }, { found: !!s.workspace?.codexFound, certain: codexSure }),
-        url: s.workspace?.claudeInstallUrl || 'https://code.claude.com/docs/en/setup',
+          && noCodingAgent({ found: false, certain: true }, { found: !!s.workspace?.codexFound, certain: codexSure }, { found: !!s.workspace?.ompkFound, certain: ompkSure }),
+        url: s.workspace?.ompkInstallUrl || s.workspace?.claudeInstallUrl || 'https://code.claude.com/docs/en/setup',
       });
     }).catch(() => { /* the walk does not end because a setting did not read */ });
   }, [atEnd]);
@@ -1156,9 +1157,9 @@ export default function App() {
   // entitled to act on, and shutting somebody out of their own app on an answer
   // we could not establish would be worse than the line she complained about.
   const recheckClaude = useCallback(async () => {
-    // Both searches, because whichever one they just installed opens the door.
-    const [r, codex] = await Promise.all([api.recheckClaude(), api.recheckCodex()]);
-    const missing = noCodingAgent(r, codex);
+    // All three searches, because whichever one they just installed opens the door.
+    const [r, codex, ompk] = await Promise.all([api.recheckClaude(), api.recheckCodex(), api.recheckOmpk()]);
+    const missing = noCodingAgent(r, codex, ompk);
     setClaude({ missing, url: r.url });
     return missing;
   }, []);

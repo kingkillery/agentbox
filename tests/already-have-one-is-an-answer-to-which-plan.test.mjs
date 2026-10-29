@@ -47,9 +47,9 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 describe('the plan question takes one more answer', () => {
-  it('still asks the same question, with the same three plans in the same order', () => {
-    expect(COPY.planHead).toBe('Which AI plan do you pay for?');
-    expect(planRows().filter((r) => r.plan).map((r) => r.name)).toEqual(['Claude', 'ChatGPT', 'Both']);
+  it('still asks the same question, with the plans in the asked order', () => {
+    expect(COPY.planHead).toBe('Which AI do you run agents on?');
+    expect(planRows().filter((r) => r.plan).map((r) => r.name)).toEqual(['ompk', 'Claude', 'ChatGPT', 'Both']);
   });
 
   // THE NEW ANSWER. Not a plan, so it sits under the rule rather than among
@@ -70,7 +70,7 @@ describe('the plan question takes one more answer', () => {
   // look runs on arrival, so by the time anybody reads these rows it has
   // already happened. tests/the-plan-question-looks-while-it-asks holds that.
   it('asks the computer itself, and only then asks the person', () => {
-    expect(planRows().map((r) => r.key)).toEqual(['claude', 'codex', 'both', 'mine', 'skip']);
+    expect(planRows().map((r) => r.key)).toEqual(['ompk', 'claude', 'codex', 'both', 'mine', 'skip']);
   });
 
   // THE CASE THAT MUST NOT MATCH, and it cost a round: a row in the separated

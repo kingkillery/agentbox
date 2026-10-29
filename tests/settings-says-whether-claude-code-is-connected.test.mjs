@@ -34,7 +34,9 @@ import { fileURLToPath } from 'node:url';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+// LF WHAT GIT CHECKS OUT: a Windows working tree is CRLF, and a pin that
+// contains a newline must not depend on the checkout's line endings.
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replaceAll('\r\n', '\n');
 
 const settings = read('renderer/src/components/Settings.tsx');
 const api = read('renderer/src/api.ts');
@@ -160,10 +162,10 @@ describe('it is said in English', () => {
 
   it('matches the voice of the only other screen that talks about this', () => {
     // The walk's own words, so the two screens do not describe one fact in two
-    // vocabularies. Since 2026-10-01 the walk names Codex beside Claude Code,
-    // because either one runs the app, and this card says only what it knows:
-    // with Codex on the Mac, "your agents run on it" would be false here.
-    expect(onboarding).toContain('missing: `${Name} could not find Claude Code or Codex on this computer, and your agents run on one of them.`');
+    // vocabularies. The walk names every agent it could be, because any one
+    // runs the app, and this card says only what it knows: with ompk or Codex
+    // on the Mac, "your agents run on it" would be false here.
+    expect(onboarding).toContain('missing: `${Name} could not find ompk, Claude Code or Codex on this computer, and your agents run on one of them.`');
     expect(copy('missingSay')).toContain(`${Name} could not find Claude Code on this computer.`);
     expect(copy('missingSay')).not.toContain('your agents run on it');
     expect(copy('missingSay')).toContain('Install it, then check again.');

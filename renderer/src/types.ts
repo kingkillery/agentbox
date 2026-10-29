@@ -1224,6 +1224,15 @@ export interface WorkspaceSettings {
       signedIn: boolean; chosen: boolean;
     }>;
   } | null;
+  /**
+   * ompk, this fork's premier coding agent: the same three facts as Codex's
+   *  card and whether its own home holds a sign-in. No accounts and no plan:
+   *  one sign-in, kept by ompk itself. Absent only from an older main. */
+  ompk?: {
+    found: boolean; certain: boolean; bin: string; url: string; trouble: string | null;
+    chosen?: boolean;
+    signedIn?: boolean;
+  } | null;
   permission: PermissionMode;
   permissionArgs: string[];
   /** The mode cloud runs start in, or 'same' for this computer's. */
@@ -1273,6 +1282,10 @@ export interface WorkspaceSettings {
   codexFound?: boolean;
   codexCertain?: boolean;
   codexInstallUrl?: string;
+  // And the same facts about ompk, which in this fork is also enough alone.
+  ompkFound?: boolean;
+  ompkCertain?: boolean;
+  ompkInstallUrl?: string;
   standingLines: number;
   // How much of the message rules is left after her edits. Zero means she
   // emptied the box, and no session is briefed with any of them. ONE count
@@ -1372,7 +1385,7 @@ declare global {
       agentConversation(p: { pid: number; sessionId: string | null; cwd: string }): Promise<AgentConversation>;
       dashboard(slug: string): Promise<any>;
       terminal(p: {product:string;id:string;action:'open'|'read'|'write'|'resize'|'close';data?:string;cols?:number;rows?:number;offset?:number;wait?:number}): Promise<any>;
-      agentUpdate?(p:{engine:string;action:'check'|'recheck'|'start'|'status'|'refresh'}):Promise<any>;
+      agentUpdate?(p:{engine:string;action:'check'|'recheck'|'start'|'setup'|'status'|'refresh'}):Promise<any>;
       commandCatalog(p: {product: string; id: string}): Promise<string[]>;
       command(p: {product: string; id: string; text: string}): Promise<{state: string; at: number; text?: string; name?: string}>;
       compact(p: { product: string; id: string }): Promise<{state: string; at: number}>;

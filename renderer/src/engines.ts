@@ -10,6 +10,7 @@
 // that behave the same in her hand should be two files that read the same.
 
 import { DEFAULT_ENGINE, isEngine, type Engine } from '../../shared/engines.mjs';
+import type { Harness } from './threads/composer-rules';
 
 export const LAST_ENGINE_KEY = 'zero.lastEngine';
 
@@ -59,14 +60,18 @@ export function engineThisMacOffers(id: string | null, choices: Engine[] | undef
 
 /**
  * THE ENGINE A NEW THREAD CARD OPENS ON (w-db6f5e331e). A remembered pick this
- * Mac offers wins. Otherwise Claude Code, unless this Mac offers Codex and not
- * Claude Code: a Codex-only Mac opened the card on "Opus 5.5" because nothing
- * had been picked yet and nothing asked what the Mac could run.
+ * Mac offers wins. Otherwise this Mac's home engine in the picker's own order:
+ * ompk where it is installed (it leads the list), then Claude Code, then Codex
+ * -- which keeps the older fix intact, since a Codex-only Mac has neither and
+ * opens on Codex rather than on "Opus 5.5" it cannot run.
  */
-export function startingEngine(last: string | null, choices: Engine[] | undefined): 'claude' | 'codex' {
+export function startingEngine(last: string | null, choices: Engine[] | undefined): Harness {
   const offers = (id: string) => (choices ?? []).some((e) => e.id === id);
+  const remembered = engineThisMacOffers(last, choices);
+  if (remembered === 'ompk' || remembered === 'codex' || remembered === 'claude') return remembered;
+  if (offers('ompk')) return 'ompk';
   if (offers('codex') && !offers('claude')) return 'codex';
-  return engineThisMacOffers(last, choices) === 'codex' ? 'codex' : 'claude';
+  return 'claude';
 }
 
 // Remembered the moment she picks, exactly like the project, the level and the

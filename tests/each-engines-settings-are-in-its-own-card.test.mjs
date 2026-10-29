@@ -22,7 +22,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const settings = fs.readFileSync(path.join(root, 'renderer/src/components/Settings.tsx'), 'utf8');
+// LF WHAT GIT CHECKS OUT: a Windows working tree is CRLF, and the SEP below
+// contains a newline, so the file is read the way git stores it.
+const settings = fs.readFileSync(path.join(root, 'renderer/src/components/Settings.tsx'), 'utf8').replaceAll('\r\n', '\n');
 
 /*
  * AND SINCE THE REDRAW (w-ccadd13c46, 2026-10-05) THE CARD IS A PAGE. Each

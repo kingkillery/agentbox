@@ -12,7 +12,7 @@
 
 export type SettingsPageId =
   | 'general' | 'appearance' | 'shortcuts' | 'phone' | 'alpha' | 'rooms'
-  | 'claude' | 'codex' | 'running' | 'cloud' | 'instructions'
+  | 'ompk' | 'claude' | 'codex' | 'running' | 'cloud' | 'instructions'
   | 'projects' | 'team';
 
 /** The menu, in the order it is drawn, under the headings it is drawn
@@ -23,6 +23,7 @@ export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: '
   { id: 'shortcuts', label: 'Shortcuts', group: 'Personal' },
   { id: 'phone', label: 'Phone', group: 'Personal' },
   { id: 'alpha', label: 'Alpha features', group: 'Personal' },
+  { id: 'ompk', label: 'ompk', group: 'Agents' },
   { id: 'claude', label: 'Claude Code', group: 'Agents' },
   { id: 'codex', label: 'Codex', group: 'Agents' },
   { id: 'running', label: 'Running', group: 'Agents' },

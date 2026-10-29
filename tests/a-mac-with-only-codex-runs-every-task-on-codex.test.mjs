@@ -202,10 +202,11 @@ describe('the inbox opens with either one', () => {
     expect(noCodingAgent(unsure, gone)).toBe(false);
   });
 
-  it('names both on the card, never Claude Code alone', async () => {
+  it('names every agent it could be, never Claude Code alone', async () => {
     const { COPY } = await import('../renderer/src/onboarding.ts');
-    expect(COPY.gateHead).toContain('Claude Code or Codex');
-    expect(COPY.missing).toContain('Claude Code or Codex');
+    expect(COPY.gateHead).toContain('coding agent');
+    expect(COPY.gateDo).toContain('ompk, Claude Code or Codex');
+    expect(COPY.missing).toContain('ompk, Claude Code or Codex');
   });
 });
 

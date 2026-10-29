@@ -40,7 +40,7 @@ export function CompactionResult({ item, engine = 'codex' }: { item: Task; engin
   }, [item.product, item.id]);
   if (!value || (value.name === 'remote-control' && value.state === 'done') || value.state === 'forward') return null;
   return <div className="thread"><div className="thread-block" role={value.state === 'failed' ? 'alert' : 'status'} aria-live="polite">
-    <div className="thread-head">{value.name ? `/${value.name}` : engine === 'codex' ? 'Codex' : 'Claude Code'}</div>
+    <div className="thread-head">{value.name ? `/${value.name}` : engine === 'codex' ? 'Codex' : engine === 'ompk' ? 'ompk' : 'Claude Code'}</div>
     <p style={{whiteSpace: 'pre-wrap', overflowWrap: 'anywhere'}}>{value.text ?? COMPACTION_COPY[value.state as keyof typeof COMPACTION_COPY] ?? COMPACTION_COPY.failed}</p>
     {value.state === 'failed' && !value.text && <button type="button" className="compose-word" onClick={() => void runCompaction(item)}>Try again</button>}
   </div></div>;

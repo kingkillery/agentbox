@@ -111,8 +111,14 @@ export function slashRows(
   modeSet: boolean,
   claudeCode: boolean,
   nativeNames: string[] = [],
+  engine?: string | null,
 ): SlashRow[] {
   if (query === null) return [];
+  // ompk's list is not the Codex list with the boolean off. Plan is the one
+  // mode this box can hand it, and a command is here only because the live
+  // session advertised it. Borrowing either other engine's words would make
+  // Send do something the row cannot.
+  if (engine === 'ompk') return ompkRows(query, modeSet, nativeNames);
   const commands = commandsFor(claudeCode, nativeNames).filter(c => [c.name, ...c.aliases].some(w => w.startsWith(query.toLowerCase())));
   if (!claudeCode) {
     // CODEX HAS ITS OWN THREE NOW (2026-09-23). The paragraph above used to end
@@ -127,8 +133,26 @@ export function slashRows(
   return [...modes, ...cmds];
 }
 
+const OMPK_DESCRIPTION = 'Run this ompk command';
+
+function ompkCommand(name: string): ClaudeCommand {
+  return { name, description: OMPK_DESCRIPTION, menuDescription: null, whole: true, argumentHint: '[arguments]', aliases: [] };
+}
+
+function ompkRows(query: string, modeSet: boolean, nativeNames: string[]): SlashRow[] {
+  const q = query.toLowerCase();
+  const modes: SlashRow[] = [];
+  if ('plan'.startsWith(q)) modes.push({ kind: 'mode', mode: 'plan' });
+  if (modeSet && (q === '' || 'clear'.startsWith(q))) modes.push({ kind: 'mode', mode: null });
+  const commands: SlashRow[] = nativeNames
+    .filter((name) => /^[a-z][a-z0-9:_-]*$/i.test(name) && name.toLowerCase().startsWith(q))
+    .map((name) => ({ kind: 'command', cmd: ompkCommand(name) }));
+  return [...modes, ...commands];
+}
+
 /** Every command a row can run: the session's own first, then ours. */
-function commandsFor(claudeCode: boolean, nativeNames: string[]): ClaudeCommand[] {
+function commandsFor(claudeCode: boolean, nativeNames: string[], engine: string | null = null): ClaudeCommand[] {
+  if (engine === 'ompk') return nativeNames.filter((name) => /^[a-z][a-z0-9:_-]*$/i.test(name)).map(ompkCommand);
   const native = claudeCode ? nativeNames.filter(name => !providerCommands('claude-code').some(c => c.name === name || c.aliases.includes(name))).map(name => ({name, description: NATIVE_DESCRIPTION, menuDescription: null, whole: true, argumentHint: '[arguments]', aliases: []})) : [];
   return [...native, ...providerCommands(claudeCode ? 'claude-code' : 'codex')];
 }
@@ -157,18 +181,18 @@ export function enterWaitsForWords(row: SlashRow): boolean {
  *
  *  Only once she has typed past the word: until the space, the menu is open and
  *  says it. */
-export function commandBeingWritten(text: string, claudeCode: boolean, nativeNames: string[]): ClaudeCommand | null {
+export function commandBeingWritten(text: string, claudeCode: boolean, nativeNames: string[], engine: string | null = null): ClaudeCommand | null {
   const m = text.match(/^\/([a-z][a-z0-9:_-]*)\s/i);
   if (!m) return null;
   const word = m[1].toLowerCase();
-  return commandsFor(claudeCode, nativeNames).find(c => c.name === word || c.aliases.includes(word)) ?? null;
+  return commandsFor(claudeCode, nativeNames, engine).find(c => c.name === word || c.aliases.includes(word)) ?? null;
 }
 
 /**
  * WHAT THE BOX SAYS FAINTLY AFTER A COMMAND before she has written anything:
  *  what it takes, if it takes anything, and that Send runs it. */
 export function holdingHint(cmd: ClaudeCommand): string {
-  if (cmd.description === NATIVE_DESCRIPTION) return `what it should do, then ${SEND}`;
+  if (cmd.description === NATIVE_DESCRIPTION || cmd.description === OMPK_DESCRIPTION) return `what it should do, then ${SEND}`;
   const hint = cmd.argumentHint?.replace(/^[<[]|[>\]]$/g, '');
   return hint ? `${hint}, then ${SEND}` : `${SEND} to run`;
 }

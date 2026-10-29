@@ -988,8 +988,8 @@ export const COPY = {
   nameGo: 'Continue',
   // CLAUDE CODE MISSING IS THE LINE ONLY. One quiet line here and
   // no screen of its own anywhere: the walk never stops and never gains a step.
-  missing: `${Name} could not find Claude Code or Codex on this computer, and your agents run on one of them.`,
-  missingLink: 'Get Claude Code',
+  missing: `${Name} could not find ompk, Claude Code or Codex on this computer, and your agents run on one of them.`,
+  missingLink: 'Get ompk',
   nameQ: 'What is this project called?',
   // The clause is kept here and drawn nowhere, because deleting the words is
   // how a later session finds out they were once on the screen.
@@ -1327,8 +1327,8 @@ export const COPY = {
   // headline names it, `missing` above says what was looked for, and the two
   // buttons are the way through. `finishGo` is not drawn at all, because a
   // button that opens an inbox nobody can work in is a broken promise.
-  gateHead: `${Name} needs Claude Code or Codex.`,
-  gateDo: `Install either one, then check again. Your inbox opens as soon as ${NAME} can see it.`,
+  gateHead: `${Name} needs a coding agent.`,
+  gateDo: `Install ompk, Claude Code or Codex, then check again. Your inbox opens as soon as ${NAME} can see it.`,
   gateCheck: 'Check again',
   // What each of the two ways out says WHILE it is working. The row that was
   // pressed says it, because the row is the only thing that was pressed.
@@ -1473,11 +1473,12 @@ export function mayOpenInbox(claude: { missing: boolean }): boolean {
 
 /**
  * WHETHER THIS MAC HAS NO CODING AGENT AT ALL, which is the only thing the
- *  last card shuts the inbox for. Claude Code or Codex is enough, so it takes a
- *  certain "not here" about BOTH. An unsure search about either one keeps the
- *  door open, for the reason `certain` exists everywhere else in this file. */
-export function noCodingAgent(claude: { found: boolean; certain: boolean }, codex: { found: boolean; certain: boolean }): boolean {
-  return claude.certain && !claude.found && codex.certain && !codex.found;
+ *  last card shuts the inbox for. Any one of ompk, Claude Code or Codex is
+ *  enough, so it takes a certain "not here" about ALL THREE. An unsure search
+ *  about any one keeps the door open, for the reason `certain` exists
+ *  everywhere else in this file. */
+export function noCodingAgent(claude: { found: boolean; certain: boolean }, codex: { found: boolean; certain: boolean }, ompk: { found: boolean; certain: boolean } = { found: false, certain: true }): boolean {
+  return claude.certain && !claude.found && codex.certain && !codex.found && ompk.certain && !ompk.found;
 }
 
 /* ------------------------------ THE CARD ---------------------------------- */

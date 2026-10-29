@@ -132,7 +132,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   // agent; null means Claude Code. It is read before the model because model
   // memory is kept per engine. It is clamped to what this Mac offers, because
   // the remembered engine may since have been uninstalled or gated off.
-  const engineRows = engineChoices ?? [ENGINES[0]];
+  const engineRows = engineChoices ?? [ENGINES.find((e) => e.id === DEFAULT_ENGINE) ?? ENGINES[0]];
   const [engine, setEngine] = useState<string | null>(() => engineThisMacOffers(readLastEngine(undefined, workspaceEngine), engineRows));
   // Read from that engine's own memory. Null means nothing was named, and the
   // clause says what would run.
@@ -308,11 +308,13 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
       // runs it until they hand it to one.
       ...(givenTo ? { assignee: givenTo, ...(due ? { due } : {}) } : {}),
       // The spawn turns the model into `--model` for Claude Code or
-      // `thread/start`'s `model` for Codex. Claude Code always gets one, the
-      // default included: this card is the only place the model is asked, and
-      // sending nothing let a `--model` flag in zero.config.json win. For Codex,
-      // no model means ~/.codex/config.toml decides, so it is sent only when picked.
-      ...(engine === 'codex'
+      // `thread/start`'s `model` for Codex; ompk reads the same flag where a
+      // model is named. Claude Code always gets one, the default included: this
+      // card is the only place the model is asked, and sending nothing let a
+      // `--model` flag in zero.config.json win. For Codex, no model means
+      // ~/.codex/config.toml decides, so it is sent only when picked -- and
+      // ompk is the same: a word it never advertised would be a guess.
+      ...(engine === 'codex' || engine === 'ompk'
         ? (engineModelPicked(engine, model, codexModelDefault ?? null) ? { model: model as string } : {})
         : { model: model ?? DEFAULT_MODEL }),
       // Null is how this card spells Claude Code, so it is sent as the default

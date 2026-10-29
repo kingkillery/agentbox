@@ -25,6 +25,10 @@ import { harnessFor } from './harnesses.mjs';
 import { spawn as nodeSpawn } from 'node:child_process';
 import { terminalEnv } from './task-terminals.mjs';
 import { codexLaunchEnv } from './codex-launch-env.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { loadPty } from './pty.mjs';
+import { ompkAgentDir } from './harnesses/ompk.mjs';
 
 export function installCommand(engine) { return harnessFor(engine).install(); }
 
@@ -43,22 +47,44 @@ const STATUS_TIMEOUT = 15_000;
 const POLL = 2_000;
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
 
-function realSpawn(file, args, { env, onData, keepStdin = false } = {}) {
+
+function realSpawn(file, args, { env, onData, keepStdin = false, pty = false } = {}) {
   let child;
   try {
-    child = nodeSpawn(file, args, { env, stdio: [keepStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
+    // ompk's setup is a TUI that exits 1 the moment stdin is not a terminal --
+    // measured on Windows 2026-10-29 -- so its sign-in spawns in the app's own
+    // PTY rather than in a pipe that answers the question before it is asked.
+    if (pty) child = loadPty().spawn(file, args, { env, cols: 80, rows: 24, name: 'xterm-256color' });
+    else child = nodeSpawn(file, args, { env, stdio: [keepStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
   } catch (error) {
     onData?.(`${error.message}\n`);
     return { exit: Promise.resolve(127), kill() {} };
   }
   const feed = (d) => onData?.(String(d));
-  child.stdout?.on('data', feed);
-  child.stderr?.on('data', feed);
+  if (pty) child.onData(feed);
+  else { child.stdout?.on('data', feed); child.stderr?.on('data', feed); }
   const exit = new Promise((resolve) => {
-    child.on('exit', (code) => resolve(code ?? 1));
-    child.on('error', (error) => { onData?.(`${error.message}\n`); resolve(127); });
+    if (pty) child.onExit(({ exitCode }) => resolve(exitCode ?? 1));
+    else {
+      child.on('exit', (code) => resolve(code ?? 1));
+      child.on('error', (error) => { onData?.(`${error.message}\n`); resolve(127); });
+    }
   });
   return { exit, kill: () => { try { child.kill('SIGTERM'); } catch { /* already gone */ } } };
+}
+
+/**
+ * ompk HAS NO CLI WORD FOR "AM I SIGNED IN". `setup --check` is its optional
+ *  component check and `--json` prints usage (measured 2026-10-29); `token`
+ *  names a provider and can stall minutes on an OAuth refresh. The harness's
+ *  own answer is the shape of ~/.ompk/agent/auth.json, read in-process, so it
+ *  rides the same job record instead of a spawned check that never answers. */
+function ompkSignedInSync(dir) {
+  try {
+    const file = path.join(dir ?? ompkAgentDir(), 'auth.json');
+    const auth = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return !!(auth && typeof auth === 'object' && Object.keys(auth).length);
+  } catch { return false; }
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -67,11 +93,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * One setup per tool, held for the life of the app.
  *
  * `find(engine)` is the finder, looking again from scratch, and may answer
- * with a promise (the caller passes `lookAgainFor`, which also moves the
  * config so the rest of the app runs on what was just installed). `spawn` and
  * `wait` are seams for the tests; nothing in the app passes them.
  */
-export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {} } = {}) {
+export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {}, open = null } = {}) {
   const runEnv = terminalEnv(env);
   const toolEnv = (engine, bin) => engine === 'codex' ? codexLaunchEnv(bin, runEnv) : runEnv;
   const jobs = new Map();
@@ -82,6 +107,11 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
   const lastLine = (text) => text.split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? '';
 
   async function signedIn(j, bin) {
+    if (j.engine === 'ompk') {
+      const yes = ompkSignedInSync();
+      onSignIn(j.engine, yes);
+      return yes;
+    }
     const { file, args } = statusCommand(j.engine, bin);
     let output = '';
     const p = spawn(file, args, { env: toolEnv(j.engine, bin), onData: (d) => { output = (output + String(d).replace(ANSI, '')).slice(-LOG_LIMIT); } });
@@ -93,7 +123,7 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     if (code === 0 || code === 1) onSignIn(j.engine, code === 0);
     if (code === 0 || code === 1) return code === 0;
     if (output) say(j, output);
-    const name = j.engine === 'codex' ? 'Codex' : 'Claude Code';
+    const name = harnessFor(j.engine).label;
     throw new Error(code === TIMED_OUT
       ? `${name} did not answer the sign-in check. Try again.`
       : `${name} could not check sign-in: ${lastLine(output) || `exit ${code}`}`);
@@ -101,6 +131,14 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
 
   function startLogin(j, bin) {
     j.login?.kill();
+    // ompk's setup is its own terminal wizard, and a PTY nobody can see is a
+    // wizard nobody can answer, so its sign-in is delegated to the app's
+    // update terminal (main/agent-updates.mjs `setup`), drawn on screen.
+    if (j.engine === 'ompk' && open) {
+      const term = open('ompk');
+      j.login = term ?? { exit: new Promise(() => {}), kill() {} };
+      return j.login;
+    }
     const { file, args } = signInCommand(j.engine, bin);
     const login = spawn(file, args, { env: toolEnv(j.engine, bin), keepStdin: true, onData: (d) => say(j, d) });
     j.login = login;

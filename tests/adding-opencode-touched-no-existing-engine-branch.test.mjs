@@ -56,7 +56,7 @@ describe('adding OpenCode touched no existing engine branch', () => {
   it('is registered without being offered to anybody', () => {
     expect(harnessDefinition('opencode').admitted).toBe(false);
     expect(ENGINE_IDS).not.toContain('opencode');
-    expect(ENGINES.map(e => e.id)).toEqual(['claude', 'codex']);
+    expect(ENGINES.map(e => e.id)).toEqual(['ompk', 'claude', 'codex']);
     expect(isEngine('opencode')).toBe(false);
     // A row that names it still runs on the default rather than dying, which
     // is the same fallback a row naming a missing binary already gets.
@@ -95,7 +95,7 @@ describe('adding OpenCode touched no existing engine branch', () => {
     // transports, which is the promise written at the top of it.
     const definitions = read('shared/harness-definitions.mjs');
     expect(definitions).not.toMatch(/require\(|child_process|node:fs|node:http|fetch\(/);
-    expect(HARNESS_DEFINITIONS).toHaveLength(3);
+    expect(HARNESS_DEFINITIONS).toHaveLength(4);
     expect(Object.isFrozen(harnessDefinition('opencode'))).toBe(true);
   });
 

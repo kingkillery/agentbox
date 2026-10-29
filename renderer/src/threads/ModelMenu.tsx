@@ -8,7 +8,7 @@
 // what a pick does belong to the box: the card drops its menu from the top of
 // the window, the reply box raises its own from the sentence at the bottom.
 
-import type { ModelPick } from './composer-rules';
+import type { ModelPick, Harness } from './composer-rules';
 import type { EffortChoice } from '../effort';
 import { codexFreePlan } from '../models';
 import { useAgentUpdates } from '../components/AgentUpdates';
@@ -25,7 +25,7 @@ export function ModelMenu({
   page: 'recent' | 'all';
   onPage: (page: 'recent' | 'all') => void;
   recent: readonly ModelPick[];
-  every: { claude: readonly ModelPick[]; codex: readonly ModelPick[] };
+  every: { ompk?: readonly ModelPick[]; claude: readonly ModelPick[]; codex: readonly ModelPick[] };
   more: number;
   pick: ModelPick;
   onPick: (p: ModelPick) => void;
@@ -53,7 +53,7 @@ export function ModelMenu({
   const freeWhy = freeDate
     ? `Your ChatGPT plan ended ${freeDate}, so Codex offers fewer models.`
     : 'Codex offers fewer models on the ChatGPT free plan.';
-  const head = (engine: 'claude' | 'codex') => {
+  const head = (engine: Harness) => {
     const u = updates[engine];
     const due = u && ['available', 'running', 'failed'].includes(u.state) ? u.state : null;
     const tag = engine === 'codex' && free;
@@ -105,6 +105,12 @@ export function ModelMenu({
         <div className="tc-cols">
           {/* Only a column with rows (w-db6f5e331e): a Mac without Claude
               Code drew an empty CLAUDE CODE heading here. */}
+          {(every.ompk?.length ?? 0) > 0 && (
+            <div className="tc-col">
+              {head('ompk')}
+              {(every.ompk ?? []).map((p) => row(p))}
+            </div>
+          )}
           {every.claude.length > 0 && (
             <div className="tc-col">
               {head('claude')}

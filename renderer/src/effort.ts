@@ -41,6 +41,9 @@ export function effortChoicesFor(
   model: string | null,
   { codexModels = [], codexDefault = null }: { codexModels?: ModelChoice[]; codexDefault?: string | null } = {},
 ): EffortChoice[] {
+  // ompk takes no effort word at all yet, so the strip draws nothing rather
+  // than Claude Code's five on a run that would ignore them.
+  if (engine === 'ompk') return [];
   if (engine !== 'codex') return EFFORTS;
   const id = model ?? defaultModelFor(engine, codexDefault);
   if (id === CODEX_OWN) return [];
@@ -80,6 +83,7 @@ export function defaultEffortFor(
   model: string | null,
   { codexModels = [], codexDefault = null }: { codexModels?: ModelChoice[]; codexDefault?: string | null } = {},
 ): string | null {
+  if (engine === 'ompk') return null;
   const id = model ?? defaultModelFor(engine, codexDefault);
   if (engine === 'codex') {
     if (id === CODEX_OWN) return null;
@@ -120,10 +124,11 @@ export const LAST_EFFORT_KEY = 'zero.lastEffort';
  * ONE KEY PER ENGINE, the rule ../models.ts gives for the model: a level
  * remembered for Codex (`ultra`) is a word Claude Code's CLI refuses outright,
  * and the other way round is a word a Codex model may not advertise. Claude
- * Code keeps the original key, so a level she has already chosen survives.
+ * Code keeps the original key so a level already chosen survives; every other
+ * engine gets its own.
  */
 export function lastEffortKey(engine: string | null = null): string {
-  return engine === 'codex' ? `${LAST_EFFORT_KEY}.codex` : LAST_EFFORT_KEY;
+  return engine && engine !== 'claude' ? `${LAST_EFFORT_KEY}.${engine}` : LAST_EFFORT_KEY;
 }
 
 // Remembered the moment she picks, like the level, the project and the model.
@@ -138,7 +143,7 @@ export function readLastEffort(
 ): string | null {
   try {
     const raw = store?.getItem(lastEffortKey(engine));
-    const ok = engine === 'codex' ? isEffortWord(raw) : isEffort(raw);
+    const ok = engine === 'ompk' ? false : engine === 'codex' ? isEffortWord(raw) : isEffort(raw);
     return ok ? (raw as string) : null;
   } catch { return null; }
 }
@@ -149,7 +154,7 @@ export function writeLastEffort(
   engine: string | null = null,
 ): void {
   try {
-    const ok = engine === 'codex' ? isEffortWord(id) : isEffort(id);
+    const ok = engine === 'ompk' ? false : engine === 'codex' ? isEffortWord(id) : isEffort(id);
     if (!ok) store?.removeItem(lastEffortKey(engine));
     else store?.setItem(lastEffortKey(engine), id as string);
   } catch { /* a refused store is not a reason to lose the send */ }

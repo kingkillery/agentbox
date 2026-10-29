@@ -73,8 +73,9 @@ export function pickToSend(
   // Claude Code has an alias for every row in the drawer, so there is no way to
   // say "clear it" there and nothing is lost by naming what she picked. Codex
   // has no alias for its default and "Codex's own" is a real row, so null is
-  // her saying her config.toml decides.
-  const model = engine === 'codex' ? pick.model : (pick.model ?? DEFAULT_MODEL);
+  // her saying her config.toml decides. ompk is the same shape: its own model
+  // is no word at all, so null clears the row and a named word is sent.
+  const model = engine === 'codex' || engine === 'ompk' ? pick.model : (pick.model ?? DEFAULT_MODEL);
   const moves = engineCount > 1 && !!was && !!engine && engine !== was;
   return { model, effort: pick.effort, ...(moves ? { engine } : {}) };
 }

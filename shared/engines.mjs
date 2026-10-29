@@ -1,11 +1,15 @@
 import { HARNESS_DEFINITIONS } from './harness-definitions.mjs';
 // Which coding agent a task is handed to.
 //
-// Claude Code is the default. Codex measured slower on median and wandered on
-// the same tasks, so do not make it the default for anybody.
+// In this fork ompk is the premier coding agent: first in the picker (the
+// order of shared/harness-definitions.mjs), and what a machine that has it
+// runs when nobody chose (`homeEngine`). That is a fork decision, taken
+// deliberately; upstream's measurement stood the other way for the second
+// engine it admitted -- Codex measured slower on median and wandered on the
+// same tasks -- and Codex's place here is unchanged by ompk's.
 //
 // Old rows may still carry `engine: "codex"`, because the work-item fold keeps
-// every field it was given. So `engineFor` answers Claude Code unless the
+// every field it was given. So `engineFor` answers the home engine unless the
 // caller hands it `ENGINE_CHOICE_ENABLED`, and a caller that passes nothing
 // gets the safe answer.
 //
@@ -26,9 +30,10 @@ export const ENGINES = HARNESS_DEFINITIONS
 export const ENGINE_IDS = ENGINES.map((e) => e.id);
 
 /**
- * What a task runs on when nobody has chosen. It is Claude Code for the speed
- * reason at the top of this file, not because Codex lacks approvals or a
- * picker: both exist now.
+ * The engine a name nobody recognises reads as, and what runs where ompk is
+ * absent and nobody has chosen. The per-machine default is `homeEngine`;
+ * this constant is the fallback of last resort, which is why it stays
+ * Claude Code: it is the one engine the app requires to be installed.
  */
 export const DEFAULT_ENGINE = 'claude';
 
@@ -109,12 +114,15 @@ export function isEngine(id) {
 }
 
 export function engineLabel(id) {
-  return ENGINES.find((e) => e.id === id)?.label ?? ENGINES[0].label;
+  return ENGINES.find((e) => e.id === id)?.label
+    ?? ENGINES.find((e) => e.id === DEFAULT_ENGINE)?.label
+    ?? 'Claude Code';
 }
 
 /**
  * Which engines this Mac can run, given `found` (id to boolean from the
- * finders). Claude Code is listed even when not found, unless Codex was.
+ * finders). The home engine is always listed, and so is every engine found;
+ * Claude Code is listed even when not found, unless another engine is home.
  *
  * This is ungated, like `engineChoiceExists` and `enginePicked`. Its one caller
  * is `Supervisor#engineChoices`, which asks `engineChoiceSince` first, so the
@@ -124,15 +132,24 @@ export function engineLabel(id) {
  */
 export function availableEngines(found = {}) {
   const home = homeEngine(found);
-  return ENGINES.filter((e) => e.id === home || (e.id !== DEFAULT_ENGINE && found[e.id]));
+  return ENGINES.filter(
+    (e) => e.id === home || found[e.id] || (e.id === DEFAULT_ENGINE && home === DEFAULT_ENGINE),
+  );
 }
 
 /**
- * What runs on this Mac when nobody has chosen: Codex only when `found.claude`
- * is explicitly false and Codex was found. Undefined means a caller that never
- * asked, and reads as Claude Code being here.
+ * What runs on this Mac when nobody has chosen. In this fork ompk is the
+ * premier coding agent: a Mac that has it runs it by default. Without ompk
+ * the answer is what it has always been: Codex only when `found.claude` is
+ * explicitly false and Codex was found, Claude Code otherwise -- and
+ * undefined means a caller that never asked, which reads as Claude Code
+ * being here.
+ *
+ * Premier never outranks a choice. This names the default only; `engineFor`
+ * below still honours the engine a row or the workspace actually chose.
  */
 export function homeEngine(found = {}) {
+  if (found.ompk) return 'ompk';
   return found.claude === false && found.codex ? 'codex' : DEFAULT_ENGINE;
 }
 
@@ -142,20 +159,31 @@ export function engineChoiceExists(found = {}) {
 }
 
 /**
- * Which engine one work item runs on. A Mac with only Codex runs Codex.
- * Otherwise, without `enabled: ENGINE_CHOICE_ENABLED` it is Claude Code. With
- * it, the row's engine wins over the workspace default, each ignored if written
- * before the gate's moment. An engine whose binary is not on this Mac falls back
- * to Claude Code, since the row may have been chosen on another machine.
+ * Which engine one work item runs on. A Mac where Claude Code is absent runs
+ * its home engine and nothing else -- there is no choice to honour there.
+ * Otherwise, without `enabled: ENGINE_CHOICE_ENABLED` the row's own written
+ * engine is not trusted yet, so the row runs on the home engine (ompk where
+ * it is installed, Claude Code where it is not). With the gate open, the
+ * row's engine wins over the workspace default, each ignored if written
+ * before the gate's moment -- so a row that names Claude Code still runs
+ * Claude Code on an ompk Mac. An engine whose binary is not on this Mac
+ * falls back to the home engine, since the row may have been chosen on
+ * another machine.
  */
 export function engineFor(item, { config = {}, found = {}, enabled } = {}) {
-  if (homeEngine(found) !== DEFAULT_ENGINE) return homeEngine(found);
-  if (enabled !== ENGINE_CHOICE_ENABLED) return DEFAULT_ENGINE;
+  const home = homeEngine(found);
+  // Claude Code absent means a row naming it cannot run, and where the home
+  // engine is also the ONLY engine this Mac has, every row runs there — there
+  // is no choice left to honour. With another engine found beside ompk, a row
+  // that names it still runs it: premier never outranks a choice.
+  if (home !== DEFAULT_ENGINE && found[DEFAULT_ENGINE] === false
+      && !availableEngines(found).some((e) => e.id !== home)) return home;
+  if (enabled !== ENGINE_CHOICE_ENABLED) return home;
   const wanted = isEngine(item?.engine) && !engineChoiceOnRowIsStale(item, config) ? item.engine : null;
-  const fallback = isEngine(config?.engine) && !engineDefaultIsStale(config) ? config.engine : DEFAULT_ENGINE;
+  const fallback = isEngine(config?.engine) && !engineDefaultIsStale(config) ? config.engine : home;
   const pick = wanted ?? fallback;
-  if (pick === DEFAULT_ENGINE) return DEFAULT_ENGINE;
-  return found[pick] ? pick : DEFAULT_ENGINE;
+  if (pick === home) return home;
+  return found[pick] ? pick : home;
 }
 
 /**

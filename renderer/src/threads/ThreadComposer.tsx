@@ -35,7 +35,7 @@ import { Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useS
 import { PRACTICE_TASK } from '../../../shared/first-run-practice.mjs';
 import type { Product, WorkItem } from '../types';
 import type { Engine } from '../../../shared/engines.mjs';
-import { ENGINES } from '../../../shared/engines.mjs';
+import { DEFAULT_ENGINE, ENGINES } from '../../../shared/engines.mjs';
 import { api } from '../api';
 import { TeamContext, Face, firstName } from '../team/people';
 import { AgentFace } from '../components/AgentFace';
@@ -285,9 +285,10 @@ export function ThreadComposer({
   const chosenHere = chosen.filter((id) => others.some((p) => p.id === id));
 
   /* ------------------------------ model --------------------------------- */
-  const engineRows = engines?.length ? engines : [ENGINES[0]];
+  const engineRows = engines?.length ? engines : [ENGINES.find((e) => e.id === DEFAULT_ENGINE) ?? ENGINES[0]];
   const codexOffered = engineRows.some((e) => e.id === 'codex');
   const claudeOffered = engineRows.some((e) => e.id === 'claude');
+  const ompkOffered = engineRows.some((e) => e.id === 'ompk');
   const codexDefault = codexModelDefault ?? null;
   const modelOpts = { codexModels, codexDefault };
   const remembered = (): ModelPick => {
@@ -301,7 +302,10 @@ export function ThreadComposer({
     if (pick.engine === 'codex' && !codexOffered) setPick({ engine: 'claude', model: readLastModel(undefined, 'claude') ?? defaultModelFor('claude') });
     // And the other way (w-db6f5e331e): a Mac with Codex and no Claude Code.
     if (pick.engine === 'claude' && !claudeOffered && codexOffered) setPick({ engine: 'codex', model: readLastModel(undefined, 'codex', codexDefault) ?? defaultModelFor('codex', codexDefault) });
-  }, [codexOffered, claudeOffered]);
+    // ompk's pick is one row that exists wherever ompk is offered and never
+    // one that outlives it; a clamped-off pick falls to the same card rule.
+    if (pick.engine === 'ompk' && !ompkOffered) setPick({ engine: 'claude', model: readLastModel(undefined, 'claude') ?? defaultModelFor('claude') });
+  }, [codexOffered, claudeOffered, ompkOffered]);
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, pick.engine));
   const pickModel = (p: ModelPick) => {
     setPick(p);
@@ -327,10 +331,10 @@ export function ThreadComposer({
     pickModel({ engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) });
   };
   const recent = useMemo(
-    () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered }),
-    [items, codexModels, codexDefault, codexOffered, claudeOffered],
+    () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered, ompkOffered }),
+    [items, codexModels, codexDefault, codexOffered, claudeOffered, ompkOffered],
   );
-  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered }), [codexModels, codexOffered, claudeOffered]);
+  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered, ompkOffered }), [codexModels, codexOffered, claudeOffered, ompkOffered]);
   const more = moreCount(recent, every);
 
   /* ------------------------------ menus --------------------------------- */

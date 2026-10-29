@@ -49,16 +49,27 @@ export function submitReply(supervisor, payload, commit) {
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still
   // waiting. The ordered commit below rethrows them to their own caller.
-  const delivery = Promise.resolve().then(() => {
+  const delivery = Promise.resolve().then(async () => {
     if (!live) return;
-    if (permissionMode != null) throw Error('A running turn keeps its current permissions. Stop it before sending with a different permission mode.');
-    if (answer.trimStart().startsWith('/') && !session.remoteIdle) throw Error('Wait for the current turn to finish before running a slash command.');
+    // A running Claude turn keeps the permissions it was started with. ompk
+    // can take Plan on the live session, because that is a mode it has; the
+    // other words in this box are Claude Code's and setMode refuses them.
+    if (permissionMode != null) {
+      if (typeof session.child.setMode !== 'function') throw Error('A running turn keeps its current permissions. Stop it before sending with a different permission mode.');
+      await session.child.setMode(permissionMode);
+    }
+    // A slash command on Claude's stdin is not a command until the turn ends.
+    // On ompk it is the prompt, and wrapping it in the brief would make the
+    // agent read it as prose instead of running it.
+    const slashLive = answer.trimStart().startsWith('/') && !session.remoteIdle && session.child.slashWhileWorking;
+    if (answer.trimStart().startsWith('/') && !session.remoteIdle && !slashLive) throw Error('Wait for the current turn to finish before running a slash command.');
     // A held Remote Control conversation is sitting idle rather than working,
     // and the slash commands it takes stop being commands once prose is wrapped
-    // round them. Both reach it exactly as typed.
+    // round them. Both reach it exactly as typed. A live ompk slash command
+    // does too: the brief would hide the slash.
     const files = session.remoteIdle ? null : supervisor.replyFiles?.(product, answer, session.engine, id);
-    const taken = session.remoteIdle
-      ? session.child.steer(answer)
+    const taken = session.remoteIdle || slashLive
+      ? session.child.steer(answer, files?.pictures ?? [])
       : session.child.steer(liveReplyBrief(answer, files?.block), files?.pictures ?? []);
     // SENT NOW: her words go in line first, then the step is cut, in the same
     // tick, so the cut turn's result can never close the input ahead of them.

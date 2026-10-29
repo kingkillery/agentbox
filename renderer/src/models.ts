@@ -186,6 +186,10 @@ export const CODEX_OWN = '';
  * about -- and `CODEX_OWN` when that file names nothing.
  */
 export function defaultModelFor(engine: string | null, codexDefault: string | null = null): string {
+  // ompk's own is '' exactly the way Codex's own is CODEX_OWN: the app does
+  // not know which model ompk's own configuration runs, and no word is drawn
+  // where the truth is "its own".
+  if (engine === 'ompk') return '';
   if (engine !== 'codex') return DEFAULT_MODEL;
   return codexDefault ?? CODEX_OWN;
 }
@@ -205,6 +209,13 @@ export function engineModelChoices(
   id: string | null,
   { codexModels = [], codexDefault = null }: { codexModels?: ModelChoice[]; codexDefault?: string | null } = {},
 ): ModelChoice[] {
+  if (engine === 'ompk') {
+    // ONE ROW: its own. ompk offers no model list to this picker (the harness
+    // declares models missing rather than faking a list), and a model word she
+    // wrote into a thread rides beside it as itself.
+    const rows = [{ id: '', label: "ompk's own" }];
+    return id && id !== '' ? [...rows, { id, label: id }] : rows;
+  }
   if (engine !== 'codex') return modelChoices(id);
   const value = id ?? defaultModelFor(engine, codexDefault);
   if (value === CODEX_OWN) return [...codexModels, { id: CODEX_OWN, label: "Codex's own" }];
@@ -257,7 +268,9 @@ export const LAST_MODEL_KEY = 'zero.lastModel';
  * change untouched.
  */
 export function lastModelKey(engine: string | null = null): string {
-  return engine === 'codex' ? `${LAST_MODEL_KEY}.codex` : LAST_MODEL_KEY;
+  // Claude Code keeps the original key so a model already chosen survives;
+  // every other engine gets its own.
+  return engine && engine !== 'claude' ? `${LAST_MODEL_KEY}.${engine}` : LAST_MODEL_KEY;
 }
 
 // Remembered the moment she picks, exactly like the project and the level: a

@@ -117,6 +117,30 @@ describe('what "/" offers, on each of the two engines', () => {
   });
 });
 
+describe('what "/" offers on an ompk row', () => {
+  it('offers Plan and only the commands the live session advertised', () => {
+    const rows = slashRows('', false, false, ['compact', 'model'], 'ompk');
+    expect(rows.filter((r) => r.kind === 'mode').map((r) => r.mode)).toEqual(['plan']);
+    expect(rows.filter((r) => r.kind === 'command').map((r) => r.cmd.name)).toEqual(['compact', 'model']);
+    expect(rows.some((r) => r.kind === 'codexMode')).toBe(false);
+  });
+
+  it('does not borrow Claude Code or Codex commands when ompk has advertised none', () => {
+    const rows = slashRows('', false, false, [], 'ompk');
+    expect(rows).toEqual([{ kind: 'mode', mode: 'plan' }]);
+    expect(slashRows('context', false, false, [], 'ompk')).toEqual([]);
+    expect(slashRows('compact', false, false, [], 'ompk')).toEqual([]);
+  });
+
+  it('tells the composer which engine, so Plan is not offered as a Codex mode', () => {
+    const focus = read('renderer/src/components/Focus.tsx');
+    const thread = read('renderer/src/components/ItemThread.tsx');
+    expect(focus).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames, runningEngine);');
+    expect(focus).toContain("runningEngine === 'ompk'");
+    expect(thread).not.toContain("['codex', 'ompk']");
+  });
+});
+
 describe('the menu is told which engine the row runs on', () => {
   const focus = read('renderer/src/components/Focus.tsx');
 
@@ -136,7 +160,7 @@ describe('the menu is told which engine the row runs on', () => {
     // other end of it.
     expect(focus).toContain('const claudeCode = (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;');
     expect(focus.match(/const claudeCode = /g)).toHaveLength(1);
-    expect(focus).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);');
+    expect(focus).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames, runningEngine);');
     expect(focus).toContain('const canSetMode = !item.agent;');
     expect(focus).toContain('const slashOpen = menuRows.length > 0;');
     // Passed all the way down rather than stopping at Focus, which is where it
